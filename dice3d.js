@@ -133,7 +133,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   resize();
 
   // ---------------- D6 (casino) ----------------
-  const d6Size = 1;
+  const d6Size = 0.55;
   const half = d6Size / 2;
 
   // pip textures: white plastic + red pips
@@ -261,7 +261,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   // We'll build a custom icosahedron with 20 separate triangle groups so each face can have its own texture/material.
 
   const PHI = (1 + Math.sqrt(5)) / 2;
-  const d20Scale = 1.05;
+  const d20Scale = 0.55;
 
   const V = [
     [-1,  PHI, 0], [ 1,  PHI, 0], [-1, -PHI, 0], [ 1, -PHI, 0],
@@ -566,3 +566,4 @@ export function initDice3D(mountSelector = '#dice3d') {
     });
   };
 }
+
