@@ -1,6 +1,7 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
-import { RoundedBoxGeometry } from 'https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometry.js';
-import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
+// dice3d.js
+import * as THREE from 'https://esm.sh/three@0.161.0';
+import { RoundedBoxGeometry } from 'https://esm.sh/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometry.js';
+import * as CANNON from 'https://esm.sh/cannon-es@0.20.0';
 
 export function initDice3D(mountSelector = '#dice3d') {
   const mount = document.querySelector(mountSelector);
@@ -17,7 +18,8 @@ export function initDice3D(mountSelector = '#dice3d') {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   mount.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
@@ -34,7 +36,6 @@ export function initDice3D(mountSelector = '#dice3d') {
   key.shadow.camera.bottom = -10;
   scene.add(key);
 
-  // Table
   const table = new THREE.Mesh(
     new THREE.PlaneGeometry(20, 20),
     new THREE.MeshStandardMaterial({ color: 0x121520, roughness: 0.95, metalness: 0.02 })
@@ -77,7 +78,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     restitution: 0.35,
   }));
 
-  // ---------- Helpers ----------
   function resize() {
     const w = mount.clientWidth || 600;
     const h = mount.clientHeight || 520;
@@ -88,7 +88,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   new ResizeObserver(resize).observe(mount);
   resize();
 
-  // ---------- D6 (cube) ----------
+  // ---------- D6 ----------
   const d6Size = 1;
   const half = d6Size / 2;
 
@@ -100,7 +100,6 @@ export function initDice3D(mountSelector = '#dice3d') {
 
     ctx.fillStyle = '#f3f5f8';
     ctx.fillRect(0, 0, s, s);
-
     ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 10;
     ctx.strokeRect(10, 10, s - 20, s - 20);
@@ -116,7 +115,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     return tex;
   }
 
-  // +Y:1, -Y:6, +X:3, -X:4, +Z:2, -Z:5
   const d6Face = {
     px: makeFaceTexture(3),
     nx: makeFaceTexture(4),
@@ -173,19 +171,16 @@ export function initDice3D(mountSelector = '#dice3d') {
     return best.val;
   }
 
-  // ---------- D20 (icosahedron) ----------
-  // стандартные вершины икосаэдра
+  // ---------- D20 ----------
   const PHI = (1 + Math.sqrt(5)) / 2;
   const d20Scale = 0.95;
 
-  // vertices
   const v = [
     [-1,  PHI, 0], [ 1,  PHI, 0], [-1, -PHI, 0], [ 1, -PHI, 0],
     [0, -1,  PHI], [0,  1,  PHI], [0, -1, -PHI], [0,  1, -PHI],
     [ PHI, 0, -1], [ PHI, 0,  1], [-PHI, 0, -1], [-PHI, 0,  1],
   ].map(p => p.map(x => x * d20Scale));
 
-  // faces (triangles) — 20 штук
   const f = [
     [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
     [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
@@ -193,7 +188,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1],
   ];
 
-  // face index -> value (1..20). Это не “казино-нумерация”, но честно и стабильно.
   const d20FaceValue = Array.from({ length: 20 }, (_, i) => i + 1);
 
   function createD20Mesh() {
@@ -225,8 +219,6 @@ export function initDice3D(mountSelector = '#dice3d') {
 
   function getD20UpValue(mesh) {
     const up = new THREE.Vector3(0, 1, 0);
-
-    // ищем грань, чья нормаль максимально смотрит вверх
     let bestFace = 0;
     let bestDot = -Infinity;
 
@@ -252,8 +244,8 @@ export function initDice3D(mountSelector = '#dice3d') {
     return d20FaceValue[bestFace];
   }
 
-  // ---------- Dice instances ----------
-  const dice = []; // { type, mesh, body }
+  // ---------- Instances ----------
+  const dice = [];
 
   function clearDice() {
     for (const d of dice) {
@@ -268,8 +260,8 @@ export function initDice3D(mountSelector = '#dice3d') {
 
     for (let i = 0; i < count; i++) {
       const type = (sides === 6) ? 'd6' : (sides === 20) ? 'd20' : 'other';
-
       let mesh, body;
+
       if (type === 'd6') { mesh = createD6Mesh(); body = createD6Body(); }
       else if (type === 'd20') { mesh = createD20Mesh(); body = createD20Body(); }
       else { continue; }
@@ -288,7 +280,6 @@ export function initDice3D(mountSelector = '#dice3d') {
 
       scene.add(mesh);
       world.addBody(body);
-
       dice.push({ type, mesh, body });
     }
   }
@@ -347,10 +338,8 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
   requestAnimationFrame(tick);
 
-  // ---------- Public API ----------
+  // ---------- API ----------
   window.rollDice3D = async ({ sides = 20, count = 1 } = {}) => {
-    // Пока поддержим красиво d6 и d20.
-    // Остальные — можно добавить, но чтобы сайт не ломался: fallback рандомом.
     if (![6, 20].includes(sides)) {
       return Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
     }
@@ -366,6 +355,5 @@ export function initDice3D(mountSelector = '#dice3d') {
     });
   };
 
-  // demo по клику в поле
   mount.addEventListener('pointerdown', () => window.rollDice3D({ sides: 20, count: 2 }));
 }
