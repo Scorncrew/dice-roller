@@ -24,7 +24,12 @@ function pushHistory({ sides, count, values }) {
   elHist.prepend(div);
 }
 
-initDice3D('#dice3d');
+try {
+  initDice3D('#dice3d');
+} catch (e) {
+  console.error(e);
+  elStatus.textContent = 'ошибка инициализации 3D (см. Console)';
+}
 
 elRoll.addEventListener('click', async () => {
   const sides = parseInt(elSides.value, 10);
@@ -35,13 +40,17 @@ elRoll.addEventListener('click', async () => {
   elResult.textContent = '—';
 
   try {
+    if (typeof window.rollDice3D !== 'function') {
+      throw new Error('rollDice3D is not available (dice3d.js failed to load)');
+    }
+
     const values = await window.rollDice3D({ sides, count });
     elResult.textContent = values.join(', ');
     elStatus.textContent = 'готов';
     pushHistory({ sides, count, values });
   } catch (e) {
     console.error(e);
-    elStatus.textContent = 'ошибка';
+    elStatus.textContent = 'ошибка (см. Console)';
   } finally {
     elRoll.disabled = false;
   }
