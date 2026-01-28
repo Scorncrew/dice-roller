@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dice Roller 3D</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">Dice Roller</div>
+          <div class="subtitle">3D бросок на стол</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label class="field">
+          <span>Кубик</span>
+          <select id="sides">
+            <option value="6">d6</option>
+            <option value="20" selected>d20</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Количество</span>
+          <input id="count" type="number" min="1" max="10" value="2" />
+        </label>
+
+        <button id="roll" class="btn">🎲 Roll</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="stage">
+        <div id="dice3d" class="viewport"></div>
+
+        <div class="hud">
+          <div class="hud-card">
+            <div class="hud-label">Результат</div>
+            <div id="result" class="hud-value">—</div>
+          </div>
+          <div class="hud-card">
+            <div class="hud-label">Статус</div>
+            <div id="status" class="hud-value small">готов</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-title">История</div>
+        <div id="history" class="history"></div>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>Сделано для GitHub Pages • без сборки</span>
+    </footer>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
