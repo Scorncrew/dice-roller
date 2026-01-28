@@ -13,7 +13,7 @@
         <div class="dot"></div>
         <div>
           <div class="title">Dice Roller</div>
-          <div class="subtitle">d6 казино • d20 чёрный мрамор</div>
+          <div class="subtitle">d6 казино • d20 чёрный мрамор • очередь игроков</div>
         </div>
       </div>
 
@@ -27,11 +27,17 @@
         </label>
 
         <label class="field">
-          <span>Количество</span>
-          <input id="count" type="number" min="1" max="10" value="2" />
+          <span>Кол-во</span>
+          <input id="count" type="number" min="1" max="10" value="1" />
+        </label>
+
+        <label class="field checkbox">
+          <span>Авто-ход</span>
+          <input id="autoNext" type="checkbox" checked />
         </label>
 
         <button id="roll" class="btn">🎲 Roll</button>
+        <button id="next" class="btn ghost">➡️ Следующий</button>
       </div>
     </header>
 
@@ -40,6 +46,10 @@
         <div id="dice3d" class="viewport"></div>
 
         <div class="hud">
+          <div class="hud-card">
+            <div class="hud-label">Ход</div>
+            <div id="turn" class="hud-value">—</div>
+          </div>
           <div class="hud-card">
             <div class="hud-label">Результат</div>
             <div id="result" class="hud-value">—</div>
@@ -52,9 +62,21 @@
       </section>
 
       <aside class="panel">
-        <div class="panel-title">История</div>
+        <div class="panel-title">Игроки</div>
+
+        <div class="row">
+          <input id="nick" class="input" placeholder="Никнейм (Enter добавить)" />
+          <button id="addNick" class="btn">➕</button>
+        </div>
+
+        <div id="players" class="players"></div>
+
+        <div class="panel-title" style="margin-top:14px;">История</div>
         <div id="history" class="history"></div>
-        <div class="hint">Клик по столу тоже делает бросок.</div>
+
+        <div class="hint">
+          Советы: добавь игроков, жми Roll — результат запишется на текущего игрока.
+        </div>
       </aside>
     </main>
 
