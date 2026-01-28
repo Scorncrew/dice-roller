@@ -31,7 +31,7 @@ try {
   elStatus.textContent = 'ошибка инициализации 3D (см. Console)';
 }
 
-elRoll.addEventListener('click', async () => {
+async function doRoll() {
   const sides = parseInt(elSides.value, 10);
   const count = Math.max(1, Math.min(10, parseInt(elCount.value || '1', 10)));
 
@@ -54,4 +54,14 @@ elRoll.addEventListener('click', async () => {
   } finally {
     elRoll.disabled = false;
   }
+}
+
+elRoll.addEventListener('click', doRoll);
+
+// чтобы клик по столу тоже бросал — dice3d.js вызывает window.rollDice3D,
+// а мы здесь просто обновим UI, когда пользователь кликает по viewport:
+document.querySelector('#dice3d').addEventListener('pointerdown', (e) => {
+  // чтобы не триггерить, если пользователь выделяет/таскает — минимально
+  // просто вызовем тот же doRoll
+  doRoll();
 });
