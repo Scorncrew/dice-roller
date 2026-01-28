@@ -6,64 +6,82 @@ export function initDice3D(mountSelector = '#dice3d') {
   const mount = document.querySelector(mountSelector);
   if (!mount) throw new Error(`Mount not found: ${mountSelector}`);
 
-  // ---------------- THREE ----------------
+  // =========================
+  // TUNING
+  // =========================
+  const MAX_DICE = 100;
+
+  // “Арена” (невидимые стены) + размер стола
+  const ARENA_HALF = 12.5;
+  const TABLE_SIZE = 28;
+
+  // Камера: почти сверху, но немного сбоку
+  // Можешь крутить эти 3 числа:
+  const CAM_POS = new THREE.Vector3(0, 18.0, 10.8);  // выше (Y) и немного сбоку (Z)
+  const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);     // куда смотрим
+
+  // Размеры кубиков (уменьшили)
+  const D6_SIZE = 0.55;
+  const D20_SCALE = 0.62;
+
+  // =========================
+  // THREE
+  // =========================
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07080b);
 
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.set(0, 5.2, 8.6);
-  camera.lookAt(0, 0.7, 0);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 250);
+  camera.position.copy(CAM_POS);
+  camera.lookAt(CAM_LOOK);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   mount.appendChild(renderer.domElement);
 
+  // Lights
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
   const key = new THREE.DirectionalLight(0xffffff, 1.15);
-  key.position.set(6, 10, 6);
+  key.position.set(9, 16, 6);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.camera.near = 1;
-  key.shadow.camera.far = 40;
-  key.shadow.camera.left = -10;
-  key.shadow.camera.right = 10;
-  key.shadow.camera.top = 10;
-  key.shadow.camera.bottom = -10;
+  key.shadow.camera.far = 60;
+  key.shadow.camera.left = -18;
+  key.shadow.camera.right = 18;
+  key.shadow.camera.top = 18;
+  key.shadow.camera.bottom = -18;
   scene.add(key);
 
   const rim = new THREE.DirectionalLight(0xffffff, 0.35);
-  rim.position.set(-8, 7, -6);
+  rim.position.set(-10, 12, -8);
   scene.add(rim);
 
-  // Felt table texture (казино)
+  // Felt table texture
   function makeFeltTexture() {
     const s = 512;
     const c = document.createElement('canvas');
     c.width = s; c.height = s;
     const ctx = c.getContext('2d');
 
-    // base felt green
     const grad = ctx.createLinearGradient(0, 0, s, s);
     grad.addColorStop(0, '#0b3a23');
     grad.addColorStop(1, '#062417');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, s, s);
 
-    // noise fibers
     const img = ctx.getImageData(0, 0, s, s);
     for (let i = 0; i < img.data.length; i += 4) {
       const n = (Math.random() * 30 - 15);
-      img.data[i] = Math.min(255, Math.max(0, img.data[i] + n));       // R
-      img.data[i+1] = Math.min(255, Math.max(0, img.data[i+1] + n));   // G
-      img.data[i+2] = Math.min(255, Math.max(0, img.data[i+2] + n));   // B
+      img.data[i]   = Math.min(255, Math.max(0, img.data[i] + n));
+      img.data[i+1] = Math.min(255, Math.max(0, img.data[i+1] + n));
+      img.data[i+2] = Math.min(255, Math.max(0, img.data[i+2] + n));
     }
     ctx.putImageData(img, 0, 0);
 
-    // subtle vignette
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
     ctx.arc(s/2, s/2, s*0.55, 0, Math.PI*2);
@@ -77,18 +95,30 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   const table = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
+    new THREE.PlaneGeometry(TABLE_SIZE, TABLE_SIZE),
     new THREE.MeshStandardMaterial({
       map: makeFeltTexture(),
       roughness: 1.0,
-      metalness: 0.0
+      metalness: 0.0,
     })
   );
   table.rotation.x = -Math.PI / 2;
   table.receiveShadow = true;
   scene.add(table);
 
-  // ---------------- CANNON ----------------
+  function resize() {
+    const w = mount.clientWidth || 600;
+    const h = mount.clientHeight || 520;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  new ResizeObserver(resize).observe(mount);
+  resize();
+
+  // =========================
+  // CANNON
+  // =========================
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
   world.allowSleep = true;
 
@@ -102,13 +132,13 @@ export function initDice3D(mountSelector = '#dice3d') {
     quaternion: new CANNON.Quaternion().setFromEuler(-Math.PI / 2, 0, 0),
   }));
 
-  // invisible walls
+  // Walls
   const wallShape = new CANNON.Plane();
   const walls = [
-    { pos: [0, 0, -6], rot: [0, 0, 0] },
-    { pos: [0, 0,  6], rot: [0, Math.PI, 0] },
-    { pos: [-6, 0, 0], rot: [0, Math.PI/2, 0] },
-    { pos: [ 6, 0, 0], rot: [0, -Math.PI/2, 0] },
+    { pos: [0, 0, -ARENA_HALF], rot: [0, 0, 0] },
+    { pos: [0, 0,  ARENA_HALF], rot: [0, Math.PI, 0] },
+    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI/2, 0] },
+    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI/2, 0] },
   ];
   for (const w of walls) {
     const b = new CANNON.Body({ mass: 0, shape: wallShape, material: groundMat });
@@ -122,40 +152,28 @@ export function initDice3D(mountSelector = '#dice3d') {
     restitution: 0.32,
   }));
 
-  function resize() {
-    const w = mount.clientWidth || 600;
-    const h = mount.clientHeight || 520;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
-  }
-  new ResizeObserver(resize).observe(mount);
-  resize();
-
-  // ---------------- D6 (casino) ----------------
-  const d6Size = 0.55;
+  // =========================
+  // D6 (casino: white + red pips)
+  // =========================
+  const d6Size = D6_SIZE;
   const half = d6Size / 2;
 
-  // pip textures: white plastic + red pips
   function makePipFaceTexture(pips) {
     const s = 256;
     const c = document.createElement('canvas');
     c.width = s; c.height = s;
     const ctx = c.getContext('2d');
 
-    // plastic-ish base (slight gradient)
     const g = ctx.createLinearGradient(0, 0, s, s);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(1, '#e9edf3');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, s, s);
 
-    // border
     ctx.strokeStyle = 'rgba(0,0,0,0.10)';
     ctx.lineWidth = 10;
     ctx.strokeRect(10, 10, s - 20, s - 20);
 
-    // pips grid
     const r = 18;
     const off = 62;
     const cx = s / 2;
@@ -180,13 +198,10 @@ export function initDice3D(mountSelector = '#dice3d') {
       6: [P.TL, P.ML, P.BL, P.TR, P.MR, P.BR],
     };
 
-    // draw pips (casino red)
-    ctx.fillStyle = '#d10f14';
     for (const [x, y] of layouts[pips]) {
-      // little bevel shadow
       ctx.beginPath();
       ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.20)';
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
       ctx.fill();
 
       ctx.beginPath();
@@ -200,7 +215,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     return tex;
   }
 
-  // +Y top: 1, -Y bottom: 6, +X:3, -X:4, +Z:2, -Z:5
+  // +Y:1, -Y:6, +X:3, -X:4, +Z:2, -Z:5
   const d6Face = {
     px: makePipFaceTexture(3),
     nx: makePipFaceTexture(4),
@@ -257,11 +272,11 @@ export function initDice3D(mountSelector = '#dice3d') {
     return best.val;
   }
 
-  // ---------------- D20 (black marble + white numbers) ----------------
-  // We'll build a custom icosahedron with 20 separate triangle groups so each face can have its own texture/material.
-
+  // =========================
+  // D20 (prototype: metal body + recessed face inserts + engraved numbers)
+  // =========================
   const PHI = (1 + Math.sqrt(5)) / 2;
-  const d20Scale = 0.55;
+  const d20Scale = D20_SCALE;
 
   const V = [
     [-1,  PHI, 0], [ 1,  PHI, 0], [-1, -PHI, 0], [ 1, -PHI, 0],
@@ -276,134 +291,153 @@ export function initDice3D(mountSelector = '#dice3d') {
     [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1],
   ];
 
-  // stable mapping faceIndex -> value (1..20)
+  // Пока стабильная нумерация по индексу граней
+  // Если захочешь “реальную d20 раскладку (противоположные = 21)” — скажи.
   const faceValue = Array.from({ length: 20 }, (_, i) => i + 1);
 
-  function makeMarbleNumberTexture(n) {
+  const d20MetalMat = new THREE.MeshStandardMaterial({
+    color: 0x8b8c8f,
+    roughness: 0.38,
+    metalness: 0.92,
+  });
+
+  function makeInsetNumberTexture(n) {
     const s = 512;
     const c = document.createElement('canvas');
     c.width = s; c.height = s;
     const ctx = c.getContext('2d');
 
-    // base dark marble
-    const g = ctx.createRadialGradient(s*0.35, s*0.30, s*0.10, s*0.5, s*0.5, s*0.75);
+    const g = ctx.createLinearGradient(0, 0, s, s);
     g.addColorStop(0, '#1a1b1f');
-    g.addColorStop(1, '#07070a');
+    g.addColorStop(1, '#0b0c10');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, s, s);
 
     // subtle noise
     const img = ctx.getImageData(0, 0, s, s);
     for (let i = 0; i < img.data.length; i += 4) {
-      const nn = (Math.random() * 28 - 14);
+      const nn = (Math.random() * 18 - 9);
       img.data[i]   = Math.min(255, Math.max(0, img.data[i] + nn));
       img.data[i+1] = Math.min(255, Math.max(0, img.data[i+1] + nn));
       img.data[i+2] = Math.min(255, Math.max(0, img.data[i+2] + nn));
     }
     ctx.putImageData(img, 0, 0);
 
-    // marble veins
-    ctx.globalAlpha = 0.22;
-    for (let k = 0; k < 26; k++) {
-      const x0 = Math.random() * s;
-      const y0 = Math.random() * s;
-      const x1 = x0 + (Math.random() * 240 - 120);
-      const y1 = y0 + (Math.random() * 240 - 120);
-      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
-      ctx.lineWidth = 1 + Math.random() * 2.0;
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      // curvy vein
-      const cx = (x0 + x1) / 2 + (Math.random() * 140 - 70);
-      const cy = (y0 + y1) / 2 + (Math.random() * 140 - 70);
-      ctx.quadraticCurveTo(cx, cy, x1, y1);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    // border highlight
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    // thin frame highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 14;
-    ctx.strokeRect(20, 20, s - 40, s - 40);
+    ctx.strokeRect(22, 22, s - 44, s - 44);
 
-    // number in white
-    ctx.fillStyle = '#f6f7fb';
+    // Center inside triangle UV (centroid for UV triangle)
+    const cx = s * 0.50;
+    const cy = s * ((0.10 + 0.10 + 0.92) / 3) + 4;
+
+    const fontSize = 135; // уменьшенный масштаб цифр
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '900 220px system-ui, -apple-system, Segoe UI, Roboto, Arial';
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 10;
-    ctx.fillText(String(n), s/2, s/2 + 10);
-    ctx.shadowColor = 'transparent';
+    ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+
+    // engraved-ish: shadow + highlight + main
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(String(n), cx + 3, cy + 6);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillText(String(n), cx - 2, cy - 3);
+
+    ctx.fillStyle = '#d7d9dd';
+    ctx.fillText(String(n), cx, cy);
 
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 8;
     return tex;
   }
 
-  function createD20GeometryWithGroups() {
-    const positions = [];
-    const uvs = [];
-    const indices = [];
-    const geo = new THREE.BufferGeometry();
+  function faceUVs() {
+    return new Float32Array([
+      0.08, 0.10,
+      0.92, 0.10,
+      0.50, 0.92,
+    ]);
+  }
 
-    // standard triangle UVs
-    const UV = [
-      [0.08, 0.10],
-      [0.92, 0.10],
-      [0.50, 0.92],
-    ];
+  function createD20PrototypeMesh() {
+    const group = new THREE.Group();
 
-    let vertBase = 0;
+    // Metal body
+    const bodyGeo = new THREE.IcosahedronGeometry(d20Scale, 0);
 
-    for (let i = 0; i < F.length; i++) {
-      const [a, b, c] = F[i];
-
-      // duplicate vertices per face (so each face can have clean UV)
-      const A = V[a], B = V[b], C = V[c];
-
-      positions.push(A[0], A[1], A[2]);
-      positions.push(B[0], B[1], B[2]);
-      positions.push(C[0], C[1], C[2]);
-
-      uvs.push(UV[0][0], UV[0][1]);
-      uvs.push(UV[1][0], UV[1][1]);
-      uvs.push(UV[2][0], UV[2][1]);
-
-      indices.push(vertBase, vertBase + 1, vertBase + 2);
-
-      // group: 1 triangle (3 indices)
-      geo.addGroup(i * 3, 3, i);
-
-      vertBase += 3;
+    // smooth-ish lighting (fake rounding by spherical normals)
+    {
+      const pos = bodyGeo.attributes.position.array;
+      const normals = new Float32Array(pos.length);
+      for (let i = 0; i < pos.length; i += 3) {
+        const x = pos[i], y = pos[i+1], z = pos[i+2];
+        const len = Math.sqrt(x*x + y*y + z*z) || 1;
+        normals[i] = x/len; normals[i+1] = y/len; normals[i+2] = z/len;
+      }
+      bodyGeo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     }
 
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geo.setIndex(indices);
-    geo.computeVertexNormals();
-    return geo;
-  }
+    const body = new THREE.Mesh(bodyGeo, d20MetalMat);
+    body.castShadow = true;
+    group.add(body);
 
-  const d20Geometry = createD20GeometryWithGroups();
-  const d20Materials = faceValue.map((n) => {
-    const map = makeMarbleNumberTexture(n);
-    return new THREE.MeshStandardMaterial({
-      map,
-      roughness: 0.55,
-      metalness: 0.10,
-    });
-  });
+    // Recessed inserts
+    const insetDepth = d20Scale * 0.075;
+    const insetShrink = 0.86;
+
+    for (let i = 0; i < F.length; i++) {
+      const [ia, ib, ic] = F[i];
+      const A = new THREE.Vector3(...V[ia]);
+      const B = new THREE.Vector3(...V[ib]);
+      const C = new THREE.Vector3(...V[ic]);
+
+      const n = new THREE.Vector3()
+        .subVectors(B, A)
+        .cross(new THREE.Vector3().subVectors(C, A))
+        .normalize();
+
+      const center = new THREE.Vector3().addVectors(A, B).add(C).multiplyScalar(1/3);
+
+      const a2 = A.clone().sub(center).multiplyScalar(insetShrink).add(center);
+      const b2 = B.clone().sub(center).multiplyScalar(insetShrink).add(center);
+      const c2 = C.clone().sub(center).multiplyScalar(insetShrink).add(center);
+
+      a2.addScaledVector(n, -insetDepth);
+      b2.addScaledVector(n, -insetDepth);
+      c2.addScaledVector(n, -insetDepth);
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        a2.x, a2.y, a2.z,
+        b2.x, b2.y, b2.z,
+        c2.x, c2.y, c2.z,
+      ]), 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(faceUVs(), 2));
+      geo.setIndex([0, 1, 2]);
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        map: makeInsetNumberTexture(faceValue[i]),
+        roughness: 0.85,
+        metalness: 0.06,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      });
+
+      const face = new THREE.Mesh(geo, mat);
+      face.castShadow = true;
+      group.add(face);
+    }
+
+    return group;
+  }
 
   function createD20Mesh() {
-    const mesh = new THREE.Mesh(d20Geometry, d20Materials);
-    mesh.castShadow = true;
-    return mesh;
+    return createD20PrototypeMesh(); // Group
   }
 
-  // physics: convex polyhedron based on original icosahedron vertices/faces
   function createD20Body() {
     const verts = V.map(p => new CANNON.Vec3(p[0], p[1], p[2]));
     const poly = new CANNON.ConvexPolyhedron({ vertices: verts, faces: F });
@@ -419,12 +453,13 @@ export function initDice3D(mountSelector = '#dice3d') {
     });
   }
 
-  function getD20UpValue(mesh) {
+  function getD20UpValue(group) {
+    const q = group.quaternion;
     const up = new THREE.Vector3(0, 1, 0);
+
     let bestFace = 0;
     let bestDot = -Infinity;
 
-    // compute face normals from base V/F, rotate by mesh quaternion, pick most-upwards
     for (let i = 0; i < F.length; i++) {
       const [a, b, c] = F[i];
       const A = new THREE.Vector3(...V[a]);
@@ -436,7 +471,7 @@ export function initDice3D(mountSelector = '#dice3d') {
         .cross(new THREE.Vector3().subVectors(C, A))
         .normalize();
 
-      const worldN = n.applyQuaternion(mesh.quaternion);
+      const worldN = n.applyQuaternion(q);
       const d = worldN.dot(up);
 
       if (d > bestDot) {
@@ -447,7 +482,9 @@ export function initDice3D(mountSelector = '#dice3d') {
     return faceValue[bestFace];
   }
 
-  // ---------------- Instances ----------------
+  // =========================
+  // Instances
+  // =========================
   const dice = []; // { type, mesh, body }
 
   function clearDice() {
@@ -461,7 +498,18 @@ export function initDice3D(mountSelector = '#dice3d') {
   function spawnDice({ sides, count }) {
     clearDice();
 
-    for (let i = 0; i < count; i++) {
+    const safeCount = Math.max(1, Math.min(MAX_DICE, count));
+    const cols = Math.ceil(Math.sqrt(safeCount));
+    const rows = Math.ceil(safeCount / cols);
+
+    const spacing = (sides === 6)
+      ? (d6Size * 1.25)
+      : (d20Scale * 1.35);
+
+    const startX = -((cols - 1) * spacing) / 2;
+    const startZ = -((rows - 1) * spacing) / 2;
+
+    for (let i = 0; i < safeCount; i++) {
       const type = (sides === 6) ? 'd6' : (sides === 20) ? 'd20' : 'other';
       let mesh, body;
 
@@ -469,11 +517,19 @@ export function initDice3D(mountSelector = '#dice3d') {
       else if (type === 'd20') { mesh = createD20Mesh(); body = createD20Body(); }
       else { continue; }
 
-      const x = (i - (count - 1) / 2) * 1.55;
-      const y = 3 + i * 0.30;
+      const r = Math.floor(i / cols);
+      const c = i % cols;
 
-      mesh.position.set(x, y, 0);
-      body.position.set(x, y, 0);
+      const x = startX + c * spacing;
+      const z = startZ + r * spacing;
+
+      const jx = (Math.random() - 0.5) * spacing * 0.10;
+      const jz = (Math.random() - 0.5) * spacing * 0.10;
+
+      const y = 4.8 + Math.random() * 0.7;
+
+      mesh.position.set(x + jx, y, z + jz);
+      body.position.set(x + jx, y, z + jz);
 
       const q = new THREE.Quaternion().setFromEuler(
         Math.random() * Math.PI,
@@ -485,28 +541,30 @@ export function initDice3D(mountSelector = '#dice3d') {
 
       scene.add(mesh);
       world.addBody(body);
-
       dice.push({ type, mesh, body });
     }
   }
 
   function kickDice() {
     for (const d of dice) {
+      // спокойнее, чтобы визуально не разлеталось
       const impulse = new CANNON.Vec3(
-        (Math.random() * 2 - 1) * 2.3,
+        (Math.random() * 2 - 1) * 0.9,
         0,
-        -5.7 - Math.random() * 1.3
+        -2.0 - Math.random() * 0.8
       );
+
       const point = new CANNON.Vec3(
-        (Math.random() * 2 - 1) * 0.2,
-        (Math.random() * 2 - 1) * 0.2,
-        (Math.random() * 2 - 1) * 0.2
+        (Math.random() * 2 - 1) * 0.08,
+        (Math.random() * 2 - 1) * 0.08,
+        (Math.random() * 2 - 1) * 0.08
       );
+
       d.body.applyImpulse(impulse, d.body.position.vadd(point));
       d.body.angularVelocity.set(
-        (Math.random() * 2 - 1) * 12,
-        (Math.random() * 2 - 1) * 12,
-        (Math.random() * 2 - 1) * 12
+        (Math.random() * 2 - 1) * 6,
+        (Math.random() * 2 - 1) * 6,
+        (Math.random() * 2 - 1) * 6
       );
       d.body.wakeUp();
     }
@@ -526,7 +584,9 @@ export function initDice3D(mountSelector = '#dice3d') {
     });
   }
 
-  // ---------------- Loop ----------------
+  // =========================
+  // Loop
+  // =========================
   let last = performance.now();
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 1 / 30);
@@ -549,21 +609,24 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
   requestAnimationFrame(tick);
 
-  // ---------------- Public API ----------------
+  // =========================
+  // Public API
+  // =========================
   window.rollDice3D = async ({ sides = 6, count = 1 } = {}) => {
+    const safeCount = Math.max(1, Math.min(MAX_DICE, count));
+
     if (![6, 20].includes(sides)) {
-      return Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
+      return Array.from({ length: safeCount }, () => 1 + Math.floor(Math.random() * sides));
     }
 
-    spawnDice({ sides, count });
+    spawnDice({ sides, count: safeCount });
     kickDice();
     await waitStop();
 
     return dice.map(d => {
       if (d.type === 'd6') return getD6UpValue(d.mesh);
-      if (d.type === 'd20') return getD20UpValue(d.mesh);
+      if (d.type === 'd20') return getD20UpValue(d.mesh); // mesh is Group
       return 0;
     });
   };
 }
-
