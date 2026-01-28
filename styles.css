@@ -44,6 +44,8 @@ body{
 
 .controls{ display:flex; gap:10px; align-items:end; flex-wrap:wrap; justify-content:flex-end; }
 .field{ display:grid; gap:6px; font-size:12px; color:var(--muted); }
+.field.checkbox{ align-items:end; }
+.field.checkbox input{ width:18px; height:18px; }
 
 select,input{
   background:rgba(255,255,255,.05);
@@ -69,9 +71,15 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .btn:active{ transform:translateY(1px); }
 .btn:disabled{ opacity:.55; cursor:not-allowed; }
 
+.btn.ghost{
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);
+}
+.btn.ghost:hover{ background:rgba(255,255,255,.10); }
+
 .main{
   display:grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 360px;
   gap:16px;
   margin-top:16px;
 }
@@ -117,6 +125,36 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 }
 
 .panel-title{ font-weight:900; margin-bottom:10px; }
+
+.row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+.input{ flex:1; }
+
+.players{ display:grid; gap:8px; }
+.player{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.05);
+}
+.player.active{
+  border-color: rgba(255,59,59,.45);
+  box-shadow: 0 0 0 1px rgba(255,59,59,.18) inset;
+}
+.player .name{ font-weight:900; }
+.player .mini{ color:var(--muted); font-size:12px; }
+
+.iconbtn{
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius:12px;
+  padding:8px 10px;
+  cursor:pointer;
+}
+.iconbtn:hover{ background:rgba(255,255,255,.10); }
+
 .history{ display:grid; gap:10px; }
 .item{
   background:rgba(255,255,255,.05);
