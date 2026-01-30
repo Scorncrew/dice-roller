@@ -2,43 +2,38 @@ import { initDice3D } from './dice3d.js';
 
 const $ = (s) => document.querySelector(s);
 
-const elTurn    = $('#turn');
-const elResult  = $('#result');
-const elSides   = $('#sides');
-const elCount   = $('#count');
-const elAuto    = $('#autoNext');
-const elRoll    = $('#roll');
-const elNext    = $('#next');
+const STORAGE_KEY = 'dice_roller_state_v4';
 
-const elNick    = $('#nick');
-const elPick    = $('#pickColor');
-const elAddNick = $('#addNick');
-const elClearPlayers = $('#clearPlayers');
+const COLORS = [
+  '#ff3b3b', '#ff8a00', '#ffd400', '#4cd964',
+  '#00d2ff', '#3a7bff', '#8a5cff', '#ff4fd8',
+  '#ffffff', '#9aa0a6'
+];
 
-const elPlayers = $('#players');
-const elHist    = $('#history');
-const elClearHistory = $('#clearHistory');
-
-const STORAGE_KEY = 'dice_roller_players_v2';
-
-let players = []; // { name, color }
+let players = [];      // { name, color }
 let turn = 0;
 let rollingIndex = -1;
+let addColor = COLORS[0];
 
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, turn }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, turn, addColor }));
 }
 
 function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (data && Array.isArray(data.players)) {
-      players = data.players
-        .filter(p => p && typeof p.name === 'string')
-        .map(p => ({ name: p.name, color: p.color || '#ff3b3b' }));
-      turn = clamp(data.turn || 0, 0, Math.max(0, players.length - 1));
+    if (data) {
+      if (Array.isArray(data.players)) {
+        players = data.players
+          .filter(p => p && typeof p.name === 'string')
+          .map(p => ({ name: p.name, color: p.color || COLORS[0] }));
+      }
+      if (typeof data.turn === 'number') {
+        turn = clamp(data.turn, 0, Math.max(0, players.length - 1));
+      }
+      if (typeof data.addColor === 'string') addColor = data.addColor;
     }
   } catch {}
 }
@@ -57,10 +52,24 @@ function flashResult() {
   const card = document.querySelector('.result-card');
   if (!card) return;
   card.classList.add('flash');
-  setTimeout(() => card.classList.remove('flash'), 500);
+  setTimeout(() => card.classList.remove('flash'), 520);
+}
+
+function renderPalette(containerEl, selectedColor, onPick) {
+  containerEl.innerHTML = '';
+  COLORS.forEach((c) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch' + (c.toLowerCase() === selectedColor.toLowerCase() ? ' selected' : '');
+    b.style.setProperty('--c', c);
+    b.title = c;
+    b.addEventListener('click', () => onPick(c));
+    containerEl.appendChild(b);
+  });
 }
 
 function renderPlayers() {
+  const elPlayers = $('#players');
   elPlayers.innerHTML = '';
 
   players.forEach((p, i) => {
@@ -72,27 +81,35 @@ function renderPlayers() {
     row.style.setProperty('--pcolor', p.color);
 
     row.innerHTML = `
-      <div>
+      <div style="min-width:0">
         <div class="name">${p.name}</div>
         <div class="mini">${isRolling ? 'бросает…' : (isActive ? 'сейчас ходит' : 'в очереди')}</div>
+        <div class="palette" data-role="ppalette" data-i="${i}" style="margin-top:8px"></div>
       </div>
 
       <div class="pactions">
-        <input class="player-color" type="color" value="${p.color}" title="Цвет карточки" data-act="color" data-i="${i}">
         <button class="iconbtn" data-act="set" data-i="${i}" title="Сделать текущим">🎯</button>
         <button class="iconbtn" data-act="del" data-i="${i}" title="Удалить">🗑️</button>
       </div>
     `;
 
     elPlayers.appendChild(row);
+
+    // рендер палитры на карточке
+    const pal = row.querySelector('[data-role="ppalette"]');
+    renderPalette(pal, p.color, (c) => {
+      players[i].color = c;
+      renderPlayers();
+      save();
+    });
   });
 
-  elTurn.textContent = currentPlayer().name;
+  $('#turn').textContent = currentPlayer().name;
   save();
 }
 
 function pushHistory({ player, color, sides, count, values }) {
-  // ограничитель на историю, чтобы DOM не раздувался бесконечно
+  const elHist = $('#history');
   const MAX_ITEMS = 200;
 
   const div = document.createElement('div');
@@ -105,7 +122,6 @@ function pushHistory({ player, color, sides, count, values }) {
   `;
   elHist.prepend(div);
 
-  // trim
   while (elHist.children.length > MAX_ITEMS) {
     elHist.removeChild(elHist.lastElementChild);
   }
@@ -117,18 +133,17 @@ function nextTurn() {
   renderPlayers();
 }
 
-function addPlayer(name, color) {
+function addPlayer(name) {
   const n = (name || '').trim();
   if (!n) return;
 
-  // без дублей
   const exists = players.some(p => p.name.toLowerCase() === n.toLowerCase());
   if (exists) return;
 
-  players.push({ name: n, color: color || '#ff3b3b' });
+  players.push({ name: n, color: addColor });
   if (players.length === 1) turn = 0;
 
-  elNick.value = '';
+  $('#nick').value = '';
   renderPlayers();
 }
 
@@ -143,86 +158,35 @@ function setTurn(i) {
   renderPlayers();
 }
 
-function setPlayerColor(i, color) {
-  if (!players[i]) return;
-  players[i].color = color || players[i].color;
-  renderPlayers();
-}
-
-// init 3D
-try {
-  initDice3D('#dice3d');
-} catch (e) {
-  console.error(e);
-}
-
-// UI events
-elAddNick.addEventListener('click', () => addPlayer(elNick.value, elPick.value));
-elNick.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addPlayer(elNick.value, elPick.value);
-});
-
-elClearPlayers.addEventListener('click', () => {
-  players = [];
-  turn = 0;
-  rollingIndex = -1;
-  renderPlayers();
-});
-
-elPlayers.addEventListener('click', (e) => {
-  const btn = e.target.closest('button');
-  if (!btn) return;
-  const act = btn.dataset.act;
-  const i = parseInt(btn.dataset.i, 10);
-  if (Number.isNaN(i)) return;
-
-  if (act === 'del') removePlayer(i);
-  if (act === 'set') setTurn(i);
-});
-
-elPlayers.addEventListener('input', (e) => {
-  const input = e.target.closest('input[type="color"]');
-  if (!input) return;
-  const act = input.dataset.act;
-  const i = parseInt(input.dataset.i, 10);
-  if (act === 'color' && !Number.isNaN(i)) {
-    setPlayerColor(i, input.value);
-  }
-});
-
-elNext.addEventListener('click', nextTurn);
-
-elClearHistory.addEventListener('click', () => {
-  elHist.innerHTML = '';
-});
-
 async function doRoll() {
-  const sides = parseInt(elSides.value, 10);
-  const count = clamp(parseInt(elCount.value || '1', 10), 1, 100);
+  const sides = parseInt($('#sides').value, 10);
+  const count = clamp(parseInt($('#count').value || '1', 10), 1, 100);
 
   const p = currentPlayer();
+  const elRoll = $('#roll');
 
   elRoll.disabled = true;
-  elResult.textContent = '—';
+  $('#result').textContent = '—';
 
   try {
     if (typeof window.rollDice3D !== 'function') {
-      throw new Error('rollDice3D is not available (dice3d.js failed to load)');
+      console.error('rollDice3D is not available. Check filenames and paths.');
+      alert('3D не инициализирован. Проверь, что dice3d.js рядом с main.js и имена файлов совпадают по регистру.');
+      return;
     }
 
-    // подсвечиваем игрока, который СЕЙЧАС бросает
     rollingIndex = players.length ? turn : -1;
     renderPlayers();
 
     const values = await window.rollDice3D({ sides, count });
 
-    elResult.textContent = values.join(', ');
+    $('#result').textContent = values.join(', ');
     flashResult();
     pushHistory({ player: p.name, color: p.color, sides, count, values });
 
-    if (elAuto.checked && players.length) nextTurn();
+    if ($('#autoNext').checked && players.length) nextTurn();
   } catch (e) {
-    console.error(e);
+    console.error('Roll failed:', e);
   } finally {
     rollingIndex = -1;
     renderPlayers();
@@ -230,11 +194,76 @@ async function doRoll() {
   }
 }
 
-elRoll.addEventListener('click', doRoll);
+window.addEventListener('DOMContentLoaded', () => {
+  // init 3D (важно: после DOM)
+  try {
+    initDice3D('#dice3d');
+  } catch (e) {
+    console.error('initDice3D failed:', e);
+  }
 
-// click on table => roll
-$('#dice3d').addEventListener('pointerdown', () => doRoll());
+  // bind UI
+  $('#addNick').addEventListener('click', () => addPlayer($('#nick').value));
+  $('#nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') addPlayer($('#nick').value); });
 
-// load state
-load();
-renderPlayers();
+  $('#clearPlayers').addEventListener('click', () => {
+    players = [];
+    turn = 0;
+    rollingIndex = -1;
+    renderPlayers();
+  });
+
+  $('#players').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const i = parseInt(btn.dataset.i, 10);
+    if (Number.isNaN(i)) return;
+
+    if (act === 'del') removePlayer(i);
+    if (act === 'set') setTurn(i);
+  });
+
+  $('#next').addEventListener('click', nextTurn);
+  $('#roll').addEventListener('click', doRoll);
+  $('#dice3d').addEventListener('pointerdown', doRoll);
+
+  $('#clearHistory').addEventListener('click', () => { $('#history').innerHTML = ''; });
+
+  // load + palette for adding player
+  load();
+  renderPalette($('#addPalette'), addColor, (c) => {
+    addColor = c;
+    renderPalette($('#addPalette'), addColor, () => {}); // перерисуем ниже корректно
+    // (перерисуем по-человечески)
+    renderPalette($('#addPalette'), addColor, (cc) => {
+      addColor = cc;
+      renderPalette($('#addPalette'), addColor, arguments.callee);
+      save();
+    });
+    save();
+  });
+
+  // нормальная перерисовка addPalette (без хитростей с arguments.callee)
+  // просто сделаем ещё раз правильно:
+  renderPalette($('#addPalette'), addColor, (c) => {
+    addColor = c;
+    renderPalette($('#addPalette'), addColor, (cc) => {
+      addColor = cc;
+      renderPalette($('#addPalette'), addColor, (ccc) => {
+        addColor = ccc;
+        renderPalette($('#addPalette'), addColor, () => {});
+        save();
+      });
+      save();
+    });
+    save();
+  });
+
+  // в итоге — перерисуем нормально одним вызовом:
+  const addPal = $('#addPalette');
+  const repaintAdd = () => renderPalette(addPal, addColor, (c) => { addColor = c; repaintAdd(); save(); });
+  repaintAdd();
+
+  renderPlayers();
+});
