@@ -48,9 +48,10 @@
 
         <div class="row">
           <input id="nick" class="input" placeholder="Никнейм (Enter добавить)" />
-          <input id="pickColor" class="color" type="color" value="#ff3b3b" title="Цвет игрока" />
           <button id="addNick" class="btn">➕</button>
         </div>
+
+        <div class="palette" id="addPalette" aria-label="Палитра цвета игрока"></div>
 
         <div class="row small">
           <button id="clearPlayers" class="btn ghost w100">🧹 Очистить игроков</button>
@@ -59,7 +60,7 @@
         <div id="players" class="players-list"></div>
 
         <div class="hint">
-          🎯 — сделать текущим • 🗑️ — удалить • цвет меняется прямо в карточке
+          🎯 — сделать текущим • 🗑️ — удалить • цвет выбирается палитрой
         </div>
       </aside>
 
@@ -72,6 +73,7 @@
             <div class="hud-label">Ход</div>
             <div id="turn" class="hud-value">—</div>
           </div>
+
           <div class="hud-card result-card">
             <div class="hud-label">Результат</div>
             <div id="result" class="hud-value">—</div>
