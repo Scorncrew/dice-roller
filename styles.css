@@ -1,12 +1,14 @@
 :root{
   --bg:#07080b;
-  --card:#10131a;
   --stroke:rgba(255,255,255,.10);
   --text:#eef1f7;
   --muted:rgba(238,241,247,.65);
   --accent:#ff3b3b;
   --shadow:0 18px 55px rgba(0,0,0,.55);
   --r:16px;
+
+  /* “ограничитель в длину всего стола” */
+  --stageH: 520px;
 }
 
 *{ box-sizing:border-box; }
@@ -21,7 +23,7 @@ body{
     var(--bg);
 }
 
-.app{ max-width:1200px; margin:0 auto; padding:16px; }
+.app{ max-width:1320px; margin:0 auto; padding:16px; }
 
 .topbar{
   display:flex; gap:16px;
@@ -66,6 +68,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   cursor:pointer;
   font-weight:800;
   transition:transform .08s ease, background .2s ease;
+  user-select:none;
 }
 .btn:hover{ background:rgba(255,59,59,.18); }
 .btn:active{ transform:translateY(1px); }
@@ -79,11 +82,13 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 
 .main{
   display:grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 320px 1fr 320px; /* игроки слева, броски справа */
   gap:16px;
   margin-top:16px;
+  align-items:stretch;
 }
 
+/* CENTER STAGE */
 .stage{
   position:relative;
   background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
@@ -91,11 +96,16 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:var(--r);
   overflow:hidden;
   box-shadow:var(--shadow);
-  min-height:520px;
+  height: calc(var(--stageH) + 120px); /* viewport + HUD зона */
+  min-height: calc(var(--stageH) + 120px);
 }
 
-.viewport{ height:520px; width:100%; }
+.viewport{
+  height: var(--stageH);
+  width:100%;
+}
 
+/* HUD */
 .hud{
   position:absolute;
   left:14px; bottom:14px;
@@ -108,28 +118,76 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   backdrop-filter:blur(10px);
   border-radius:14px;
   padding:10px 12px;
-  min-width:160px;
+  min-width:180px;
 }
 
 .hud-label{ color:var(--muted); font-size:12px; }
 .hud-value{ font-size:22px; font-weight:900; margin-top:4px; }
-.hud-value.small{ font-size:14px; font-weight:800; color:rgba(238,241,247,.85); }
 
+.result-card.flash{
+  border-color: rgba(255,59,59,.70);
+  box-shadow:
+    0 0 0 2px rgba(255,59,59,.18) inset,
+    0 0 26px rgba(255,59,59,.18);
+}
+
+/* PANELS (LEFT/RIGHT) */
 .panel{
   background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
   border:1px solid var(--stroke);
   border-radius:var(--r);
   padding:14px;
   box-shadow:var(--shadow);
-  min-height:520px;
+  height: calc(var(--stageH) + 120px);
+  min-height: calc(var(--stageH) + 120px);
+  overflow:hidden; /* ВАЖНО: чтобы панель не “удлинялась” */
+  display:flex;
+  flex-direction:column;
 }
 
 .panel-title{ font-weight:900; margin-bottom:10px; }
 
 .row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+.row.small{ margin-bottom:8px; }
 .input{ flex:1; }
 
-.players{ display:grid; gap:8px; }
+.color{
+  width:44px;
+  height:44px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  padding:0;
+}
+
+.w100{ width:100%; }
+
+/* PLAYERS LIST */
+.players-list{
+  display:grid;
+  gap:8px;
+  overflow-y:auto; /* скролл внутри панели */
+  padding-right:6px;
+  flex:1;
+}
+
+/* тонкий скролл */
+.players-list::-webkit-scrollbar,
+.history::-webkit-scrollbar{
+  width:10px;
+}
+.players-list::-webkit-scrollbar-thumb,
+.history::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14);
+  border-radius:999px;
+  border:2px solid rgba(0,0,0,.25);
+}
+.players-list::-webkit-scrollbar-track,
+.history::-webkit-scrollbar-track{
+  background:rgba(255,255,255,.06);
+  border-radius:999px;
+}
+
 .player{
   display:flex; align-items:center; justify-content:space-between;
   gap:10px;
@@ -137,13 +195,47 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:14px;
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.05);
+  position:relative;
+  overflow:hidden;
 }
+
+/* цвет карточки игрока */
+.player::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background: var(--pcolor, rgba(255,59,59,.10));
+  opacity: .18;
+  pointer-events:none;
+}
+.player::after{
+  content:"";
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:6px;
+  background: var(--pcolor, rgba(255,59,59,.80));
+  opacity:.9;
+  pointer-events:none;
+}
+
 .player.active{
-  border-color: rgba(255,59,59,.45);
-  box-shadow: 0 0 0 1px rgba(255,59,59,.18) inset;
+  border-color: rgba(255,255,255,.18);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset;
 }
-.player .name{ font-weight:900; }
-.player .mini{ color:var(--muted); font-size:12px; }
+
+.player.rolling{
+  border-color: rgba(255,59,59,.85);
+  box-shadow:
+    0 0 0 2px rgba(255,59,59,.18) inset,
+    0 0 22px rgba(255,59,59,.18);
+}
+
+.player .name{ font-weight:900; position:relative; }
+.player .mini{ color:var(--muted); font-size:12px; margin-top:2px; position:relative; }
+
+.pactions{
+  display:flex; gap:8px; align-items:center; position:relative;
+}
 
 .iconbtn{
   border:1px solid rgba(255,255,255,.14);
@@ -152,10 +244,34 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:12px;
   padding:8px 10px;
   cursor:pointer;
+  user-select:none;
 }
 .iconbtn:hover{ background:rgba(255,255,255,.10); }
 
-.history{ display:grid; gap:10px; }
+.player-color{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  padding:0;
+}
+
+/* ROLLS / HISTORY */
+.rolls-toolbar{
+  display:flex;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.history{
+  display:grid;
+  gap:10px;
+  overflow-y:auto;   /* СКРОЛЛ ДЛЯ УЧЁТА БРОСКОВ */
+  padding-right:6px;
+  flex:1;            /* не растёт панель */
+}
+
 .item{
   background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.10);
@@ -178,9 +294,10 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   text-align:center;
 }
 
-@media (max-width:980px){
-  .main{ grid-template-columns:1fr; }
-  .panel{ min-height:auto; }
-  .viewport{ height:440px; }
-  .stage{ min-height:440px; }
+/* Responsive */
+@media (max-width:1120px){
+  .main{ grid-template-columns: 1fr; }
+  .panel{ height:auto; min-height:auto; }
+  .stage{ height:auto; min-height:auto; }
+  :root{ --stageH: 440px; }
 }
