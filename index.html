@@ -13,7 +13,7 @@
         <div class="dot"></div>
         <div>
           <div class="title">Dice Roller</div>
-          <div class="subtitle">d6 казино • d20 чёрный мрамор • очередь игроков</div>
+          <div class="subtitle">d6 казино • d20 прототип • очередь игроков</div>
         </div>
       </div>
 
@@ -28,7 +28,7 @@
 
         <label class="field">
           <span>Кол-во</span>
-          <input id="count" type="number" min="1" max="10" value="1" />
+          <input id="count" type="number" min="1" max="100" value="2" />
         </label>
 
         <label class="field checkbox">
@@ -42,6 +42,28 @@
     </header>
 
     <main class="main">
+      <!-- LEFT: PLAYERS -->
+      <aside class="panel players-panel">
+        <div class="panel-title">Игроки</div>
+
+        <div class="row">
+          <input id="nick" class="input" placeholder="Никнейм (Enter добавить)" />
+          <input id="pickColor" class="color" type="color" value="#ff3b3b" title="Цвет игрока" />
+          <button id="addNick" class="btn">➕</button>
+        </div>
+
+        <div class="row small">
+          <button id="clearPlayers" class="btn ghost w100">🧹 Очистить игроков</button>
+        </div>
+
+        <div id="players" class="players-list"></div>
+
+        <div class="hint">
+          🎯 — сделать текущим • 🗑️ — удалить • цвет меняется прямо в карточке
+        </div>
+      </aside>
+
+      <!-- CENTER: TABLE -->
       <section class="stage">
         <div id="dice3d" class="viewport"></div>
 
@@ -50,32 +72,25 @@
             <div class="hud-label">Ход</div>
             <div id="turn" class="hud-value">—</div>
           </div>
-          <div class="hud-card">
+          <div class="hud-card result-card">
             <div class="hud-label">Результат</div>
             <div id="result" class="hud-value">—</div>
-          </div>
-          <div class="hud-card">
-            <div class="hud-label">Статус</div>
-            <div id="status" class="hud-value small">готов</div>
           </div>
         </div>
       </section>
 
-      <aside class="panel">
-        <div class="panel-title">Игроки</div>
+      <!-- RIGHT: ROLLS -->
+      <aside class="panel rolls-panel">
+        <div class="panel-title">Броски</div>
 
-        <div class="row">
-          <input id="nick" class="input" placeholder="Никнейм (Enter добавить)" />
-          <button id="addNick" class="btn">➕</button>
+        <div class="rolls-toolbar">
+          <button id="clearHistory" class="btn ghost">🧹 Очистить</button>
         </div>
 
-        <div id="players" class="players"></div>
-
-        <div class="panel-title" style="margin-top:14px;">История</div>
         <div id="history" class="history"></div>
 
         <div class="hint">
-          Советы: добавь игроков, жми Roll — результат запишется на текущего игрока.
+          История фиксирована по высоте стола и скроллится.
         </div>
       </aside>
     </main>
