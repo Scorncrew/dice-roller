@@ -7,7 +7,6 @@
   --shadow:0 18px 55px rgba(0,0,0,.55);
   --r:16px;
 
-  /* “ограничитель в длину всего стола” */
   --stageH: 520px;
 }
 
@@ -82,7 +81,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 
 .main{
   display:grid;
-  grid-template-columns: 320px 1fr 320px; /* игроки слева, броски справа */
+  grid-template-columns: 320px 1fr 320px;
   gap:16px;
   margin-top:16px;
   align-items:stretch;
@@ -96,14 +95,11 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:var(--r);
   overflow:hidden;
   box-shadow:var(--shadow);
-  height: calc(var(--stageH) + 120px); /* viewport + HUD зона */
+  height: calc(var(--stageH) + 120px);
   min-height: calc(var(--stageH) + 120px);
 }
 
-.viewport{
-  height: var(--stageH);
-  width:100%;
-}
+.viewport{ height: var(--stageH); width:100%; }
 
 /* HUD */
 .hud{
@@ -111,7 +107,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   left:14px; bottom:14px;
   display:flex; gap:10px; flex-wrap:wrap;
 }
-
 .hud-card{
   background:rgba(0,0,0,.28);
   border:1px solid rgba(255,255,255,.12);
@@ -120,7 +115,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   padding:10px 12px;
   min-width:180px;
 }
-
 .hud-label{ color:var(--muted); font-size:12px; }
 .hud-value{ font-size:22px; font-weight:900; margin-top:4px; }
 
@@ -131,7 +125,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
     0 0 26px rgba(255,59,59,.18);
 }
 
-/* PANELS (LEFT/RIGHT) */
+/* PANELS */
 .panel{
   background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
   border:1px solid var(--stroke);
@@ -140,7 +134,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   box-shadow:var(--shadow);
   height: calc(var(--stageH) + 120px);
   min-height: calc(var(--stageH) + 120px);
-  overflow:hidden; /* ВАЖНО: чтобы панель не “удлинялась” */
+  overflow:hidden;
   display:flex;
   flex-direction:column;
 }
@@ -150,32 +144,39 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
 .row.small{ margin-bottom:8px; }
 .input{ flex:1; }
-
-.color{
-  width:44px;
-  height:44px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);
-  padding:0;
-}
-
 .w100{ width:100%; }
 
-/* PLAYERS LIST */
+/* Palette */
+.palette{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:0 0 10px 0;
+}
+.swatch{
+  width:22px; height:22px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.18);
+  background: var(--c);
+  cursor:pointer;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.35) inset;
+}
+.swatch.selected{
+  outline:2px solid rgba(255,255,255,.65);
+  outline-offset:2px;
+}
+
+/* PLAYERS */
 .players-list{
   display:grid;
   gap:8px;
-  overflow-y:auto; /* скролл внутри панели */
+  overflow-y:auto;
   padding-right:6px;
   flex:1;
 }
 
-/* тонкий скролл */
 .players-list::-webkit-scrollbar,
-.history::-webkit-scrollbar{
-  width:10px;
-}
+.history::-webkit-scrollbar{ width:10px; }
 .players-list::-webkit-scrollbar-thumb,
 .history::-webkit-scrollbar-thumb{
   background:rgba(255,255,255,.14);
@@ -199,22 +200,22 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   overflow:hidden;
 }
 
-/* цвет карточки игрока */
+/* Делаем цвет заметнее */
 .player::before{
   content:"";
   position:absolute;
   inset:0;
-  background: var(--pcolor, rgba(255,59,59,.10));
-  opacity: .18;
+  background: var(--pcolor, rgba(255,59,59,.12));
+  opacity: .26; /* было слишком бледно */
   pointer-events:none;
 }
 .player::after{
   content:"";
   position:absolute;
   left:0; top:0; bottom:0;
-  width:6px;
-  background: var(--pcolor, rgba(255,59,59,.80));
-  opacity:.9;
+  width:7px;
+  background: var(--pcolor, rgba(255,59,59,.90));
+  opacity:.95;
   pointer-events:none;
 }
 
@@ -222,7 +223,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-color: rgba(255,255,255,.18);
   box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset;
 }
-
 .player.rolling{
   border-color: rgba(255,59,59,.85);
   box-shadow:
@@ -236,7 +236,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .pactions{
   display:flex; gap:8px; align-items:center; position:relative;
 }
-
 .iconbtn{
   border:1px solid rgba(255,255,255,.14);
   background:rgba(255,255,255,.06);
@@ -248,28 +247,15 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 }
 .iconbtn:hover{ background:rgba(255,255,255,.10); }
 
-.player-color{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);
-  padding:0;
-}
-
 /* ROLLS / HISTORY */
-.rolls-toolbar{
-  display:flex;
-  gap:10px;
-  margin-bottom:10px;
-}
+.rolls-toolbar{ display:flex; gap:10px; margin-bottom:10px; }
 
 .history{
   display:grid;
   gap:10px;
-  overflow-y:auto;   /* СКРОЛЛ ДЛЯ УЧЁТА БРОСКОВ */
+  overflow-y:auto;
   padding-right:6px;
-  flex:1;            /* не растёт панель */
+  flex:1;
 }
 
 .item{
@@ -294,7 +280,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   text-align:center;
 }
 
-/* Responsive */
 @media (max-width:1120px){
   .main{ grid-template-columns: 1fr; }
   .panel{ height:auto; min-height:auto; }
