@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dice Roller 3D</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dice Roller</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -42,15 +42,16 @@
     </header>
 
     <main class="main">
-      <!-- LEFT: PLAYERS -->
-      <aside class="panel players-panel">
+      <!-- LEFT -->
+      <aside class="panel">
         <div class="panel-title">Игроки</div>
 
         <div class="row">
           <input id="nick" class="input" placeholder="Никнейм (Enter добавить)" />
-          <input id="pickColor" class="color" type="color" value="#ff3b3b" title="Цвет игрока" />
           <button id="addNick" class="btn">➕</button>
         </div>
+
+        <div class="palette" id="addPalette" title="Выбери цвет для нового игрока"></div>
 
         <div class="row small">
           <button id="clearPlayers" class="btn ghost w100">🧹 Очистить игроков</button>
@@ -59,11 +60,11 @@
         <div id="players" class="players-list"></div>
 
         <div class="hint">
-          🎯 — сделать текущим • 🗑️ — удалить • цвет меняется прямо в карточке
+          🎯 — сделать текущим • 🗑️ — удалить • цвет — кликом по палитре
         </div>
       </aside>
 
-      <!-- CENTER: TABLE -->
+      <!-- CENTER -->
       <section class="stage">
         <div id="dice3d" class="viewport"></div>
 
@@ -72,6 +73,7 @@
             <div class="hud-label">Ход</div>
             <div id="turn" class="hud-value">—</div>
           </div>
+
           <div class="hud-card result-card">
             <div class="hud-label">Результат</div>
             <div id="result" class="hud-value">—</div>
@@ -79,8 +81,8 @@
         </div>
       </section>
 
-      <!-- RIGHT: ROLLS -->
-      <aside class="panel rolls-panel">
+      <!-- RIGHT -->
+      <aside class="panel">
         <div class="panel-title">Броски</div>
 
         <div class="rolls-toolbar">
@@ -95,9 +97,7 @@
       </aside>
     </main>
 
-    <footer class="footer">
-      <span>GitHub Pages • без сборки</span>
-    </footer>
+    <footer class="footer">GitHub Pages • без сборки</footer>
   </div>
 
   <script type="module" src="./main.js"></script>
