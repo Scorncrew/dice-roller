@@ -1,3 +1,4 @@
+// dice3d.js
 import * as THREE from 'https://esm.sh/three@0.161.0';
 import { RoundedBoxGeometry } from 'https://esm.sh/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometry.js';
 import * as CANNON from 'https://esm.sh/cannon-es@0.20.0';
@@ -11,17 +12,16 @@ export function initDice3D(mountSelector = '#dice3d') {
   // =========================
   const MAX_DICE = 100;
 
-  // “Арена” (невидимые стены) + размер стола
+  // Arena (invisible walls) + table size
   const ARENA_HALF = 12.5;
   const TABLE_SIZE = 28;
 
-  // Камера: почти сверху, но немного сбоку
-  // Можешь крутить эти 3 числа:
-  const CAM_POS = new THREE.Vector3(0, 18.0, 10.8);  // выше (Y) и немного сбоку (Z)
-  const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);     // куда смотрим
+  // Camera: almost top-down, slightly side
+  const CAM_POS  = new THREE.Vector3(0, 18.0, 10.8);
+  const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);
 
-  // Размеры кубиков (уменьшили)
-  const D6_SIZE = 0.55;
+  // Dice scale (smaller)
+  const D6_SIZE   = 0.55;
   const D20_SCALE = 0.62;
 
   // =========================
@@ -84,7 +84,7 @@ export function initDice3D(mountSelector = '#dice3d') {
 
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
-    ctx.arc(s/2, s/2, s*0.55, 0, Math.PI*2);
+    ctx.arc(s / 2, s / 2, s * 0.55, 0, Math.PI * 2);
     ctx.fill();
 
     const tex = new THREE.CanvasTexture(c);
@@ -125,6 +125,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   const groundMat = new CANNON.Material('ground');
   const diceMat = new CANNON.Material('dice');
 
+  // Ground plane
   world.addBody(new CANNON.Body({
     mass: 0,
     shape: new CANNON.Plane(),
@@ -137,8 +138,8 @@ export function initDice3D(mountSelector = '#dice3d') {
   const walls = [
     { pos: [0, 0, -ARENA_HALF], rot: [0, 0, 0] },
     { pos: [0, 0,  ARENA_HALF], rot: [0, Math.PI, 0] },
-    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI/2, 0] },
-    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI/2, 0] },
+    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI / 2, 0] },
+    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI / 2, 0] },
   ];
   for (const w of walls) {
     const b = new CANNON.Body({ mass: 0, shape: wallShape, material: groundMat });
@@ -147,6 +148,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     world.addBody(b);
   }
 
+  // Contacts
   world.addContactMaterial(new CANNON.ContactMaterial(groundMat, diceMat, {
     friction: 0.30,
     restitution: 0.32,
@@ -273,7 +275,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   // =========================
-  // D20 (prototype: metal body + recessed face inserts + engraved numbers)
+  // D20 (prototype style: metal body + recessed face inserts + centered numbers)
   // =========================
   const PHI = (1 + Math.sqrt(5)) / 2;
   const d20Scale = D20_SCALE;
@@ -291,8 +293,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1],
   ];
 
-  // Пока стабильная нумерация по индексу граней
-  // Если захочешь “реальную d20 раскладку (противоположные = 21)” — скажи.
+  // Stable numbering by face index (1..20)
   const faceValue = Array.from({ length: 20 }, (_, i) => i + 1);
 
   const d20MetalMat = new THREE.MeshStandardMaterial({
@@ -301,12 +302,26 @@ export function initDice3D(mountSelector = '#dice3d') {
     metalness: 0.92,
   });
 
+  // UV triangle used on inset faces
+  function faceUVs() {
+    return new Float32Array([
+      0.08, 0.10,
+      0.92, 0.10,
+      0.50, 0.92,
+    ]);
+  }
+
+  // Draw number so it:
+  // - centered on triangle
+  // - width ≈ 1/3 of face base width
+  // - height ≈ 1/2 of face triangle height
   function makeInsetNumberTexture(n) {
     const s = 512;
     const c = document.createElement('canvas');
     c.width = s; c.height = s;
     const ctx = c.getContext('2d');
 
+    // dark base
     const g = ctx.createLinearGradient(0, 0, s, s);
     g.addColorStop(0, '#1a1b1f');
     g.addColorStop(1, '#0b0c10');
@@ -323,57 +338,79 @@ export function initDice3D(mountSelector = '#dice3d') {
     }
     ctx.putImageData(img, 0, 0);
 
-    // thin frame highlight
+    // frame highlight
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 14;
     ctx.strokeRect(22, 22, s - 44, s - 44);
 
-    // Center inside triangle UV (centroid for UV triangle)
-    const cx = s * 0.50;
-    const cy = s * ((0.10 + 0.10 + 0.92) / 3) + 4;
+    // UV triangle points in pixels
+    const A = { x: 0.08 * s, y: 0.10 * s };
+    const B = { x: 0.92 * s, y: 0.10 * s };
+    const Cc = { x: 0.50 * s, y: 0.92 * s };
 
-    const fontSize = 135; // уменьшенный масштаб цифр
+    // centroid (center of face)
+    const cx = (A.x + B.x + Cc.x) / 3;
+    const cy = (A.y + B.y + Cc.y) / 3;
+
+    const baseW = Math.hypot(B.x - A.x, B.y - A.y);
+
+    // triangle height via area
+    const area2 = Math.abs((B.x - A.x) * (Cc.y - A.y) - (B.y - A.y) * (Cc.x - A.x));
+    const triH = area2 / baseW;
+
+    const targetW = baseW / 3;   // 1/3 width
+    const targetH = triH / 2;    // 1/2 height
+
+    const text = String(n);
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    // start from height then adjust by measurements
+    let fontSize = Math.max(24, targetH);
+    for (let k = 0; k < 3; k++) {
+      ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      const m = ctx.measureText(text);
+      const measuredW = m.width || 1;
+      const measuredH = (m.actualBoundingBoxAscent && m.actualBoundingBoxDescent)
+        ? (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent)
+        : fontSize;
+
+      const scale = Math.min(targetW / measuredW, targetH / measuredH);
+      fontSize = Math.max(18, fontSize * scale);
+    }
+
     ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
 
     // engraved-ish: shadow + highlight + main
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillText(String(n), cx + 3, cy + 6);
+    ctx.fillText(text, cx + 2.5, cy + 4.5);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillText(String(n), cx - 2, cy - 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillText(text, cx - 1.8, cy - 2.8);
 
     ctx.fillStyle = '#d7d9dd';
-    ctx.fillText(String(n), cx, cy);
+    ctx.fillText(text, cx, cy);
 
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 8;
     return tex;
   }
 
-  function faceUVs() {
-    return new Float32Array([
-      0.08, 0.10,
-      0.92, 0.10,
-      0.50, 0.92,
-    ]);
-  }
-
   function createD20PrototypeMesh() {
     const group = new THREE.Group();
 
-    // Metal body
+    // metal body
     const bodyGeo = new THREE.IcosahedronGeometry(d20Scale, 0);
 
-    // smooth-ish lighting (fake rounding by spherical normals)
+    // fake rounding by spherical normals
     {
       const pos = bodyGeo.attributes.position.array;
       const normals = new Float32Array(pos.length);
       for (let i = 0; i < pos.length; i += 3) {
-        const x = pos[i], y = pos[i+1], z = pos[i+2];
-        const len = Math.sqrt(x*x + y*y + z*z) || 1;
-        normals[i] = x/len; normals[i+1] = y/len; normals[i+2] = z/len;
+        const x = pos[i], y = pos[i + 1], z = pos[i + 2];
+        const len = Math.sqrt(x * x + y * y + z * z) || 1;
+        normals[i] = x / len; normals[i + 1] = y / len; normals[i + 2] = z / len;
       }
       bodyGeo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     }
@@ -382,7 +419,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     body.castShadow = true;
     group.add(body);
 
-    // Recessed inserts
+    // recessed inserts
     const insetDepth = d20Scale * 0.075;
     const insetShrink = 0.86;
 
@@ -390,18 +427,18 @@ export function initDice3D(mountSelector = '#dice3d') {
       const [ia, ib, ic] = F[i];
       const A = new THREE.Vector3(...V[ia]);
       const B = new THREE.Vector3(...V[ib]);
-      const C = new THREE.Vector3(...V[ic]);
+      const Cc = new THREE.Vector3(...V[ic]);
 
       const n = new THREE.Vector3()
         .subVectors(B, A)
-        .cross(new THREE.Vector3().subVectors(C, A))
+        .cross(new THREE.Vector3().subVectors(Cc, A))
         .normalize();
 
-      const center = new THREE.Vector3().addVectors(A, B).add(C).multiplyScalar(1/3);
+      const center = new THREE.Vector3().addVectors(A, B).add(Cc).multiplyScalar(1 / 3);
 
       const a2 = A.clone().sub(center).multiplyScalar(insetShrink).add(center);
       const b2 = B.clone().sub(center).multiplyScalar(insetShrink).add(center);
-      const c2 = C.clone().sub(center).multiplyScalar(insetShrink).add(center);
+      const c2 = Cc.clone().sub(center).multiplyScalar(insetShrink).add(center);
 
       a2.addScaledVector(n, -insetDepth);
       b2.addScaledVector(n, -insetDepth);
@@ -464,11 +501,11 @@ export function initDice3D(mountSelector = '#dice3d') {
       const [a, b, c] = F[i];
       const A = new THREE.Vector3(...V[a]);
       const B = new THREE.Vector3(...V[b]);
-      const C = new THREE.Vector3(...V[c]);
+      const Cc = new THREE.Vector3(...V[c]);
 
       const n = new THREE.Vector3()
         .subVectors(B, A)
-        .cross(new THREE.Vector3().subVectors(C, A))
+        .cross(new THREE.Vector3().subVectors(Cc, A))
         .normalize();
 
       const worldN = n.applyQuaternion(q);
@@ -547,7 +584,6 @@ export function initDice3D(mountSelector = '#dice3d') {
 
   function kickDice() {
     for (const d of dice) {
-      // спокойнее, чтобы визуально не разлеталось
       const impulse = new CANNON.Vec3(
         (Math.random() * 2 - 1) * 0.9,
         0,
