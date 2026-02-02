@@ -2,7 +2,8 @@ import { initDice3D } from './dice3d.js';
 
 const $ = (s) => document.querySelector(s);
 
-const STORAGE_KEY = 'dice_roller_v4';
+const STORAGE_KEY = 'dice_roller_v5';
+const MAX_PLAYERS = 6;
 
 const COLORS = [
   '#ff3b3b', '#ff8a00', '#ffd400', '#4cd964',
@@ -28,6 +29,7 @@ function load() {
     if (Array.isArray(data.players)) {
       players = data.players
         .filter(p => p && typeof p.name === 'string')
+        .slice(0, MAX_PLAYERS)
         .map(p => ({ name: p.name, color: p.color || COLORS[0] }));
     }
     turn = clamp(Number(data.turn || 0), 0, Math.max(0, players.length - 1));
@@ -72,7 +74,25 @@ function renderPlayers() {
   const elPlayers = $('#players');
   elPlayers.innerHTML = '';
 
-  players.forEach((p, i) => {
+  // РЕНДЕР РОВНО 6 СЛОТОВ
+  for (let i = 0; i < MAX_PLAYERS; i++) {
+    const p = players[i];
+
+    if (!p) {
+      const ph = document.createElement('div');
+      ph.className = 'player placeholder';
+      ph.style.setProperty('--pcolor', 'rgba(255,255,255,0.12)');
+      ph.innerHTML = `
+        <div class="pmeta">
+          <div class="pname">Пусто</div>
+          <div class="pmini">слот ${i + 1} из ${MAX_PLAYERS}</div>
+        </div>
+        <div class="pactions"></div>
+      `;
+      elPlayers.appendChild(ph);
+      continue;
+    }
+
     const isActive = i === turn;
     const isRolling = i === rollingIndex;
 
@@ -89,7 +109,7 @@ function renderPlayers() {
       <div class="pmeta">
         <div class="pname">${p.name}</div>
         <div class="pmini">${isRolling ? 'бросает…' : (isActive ? 'сейчас ходит' : 'в очереди')}</div>
-        <div class="palette" style="margin-top:10px">${paletteHtml}</div>
+        <div class="palette">${paletteHtml}</div>
       </div>
 
       <div class="pactions">
@@ -99,7 +119,7 @@ function renderPlayers() {
     `;
 
     elPlayers.appendChild(row);
-  });
+  }
 
   $('#turn').textContent = currentPlayer().name;
   save();
@@ -133,6 +153,11 @@ function addPlayer(name) {
   const n = (name || '').trim();
   if (!n) return;
 
+  if (players.length >= MAX_PLAYERS) {
+    alert(`Максимум ${MAX_PLAYERS} игроков.`);
+    return;
+  }
+
   const exists = players.some(p => p.name.toLowerCase() === n.toLowerCase());
   if (exists) return;
 
@@ -150,6 +175,7 @@ function removePlayer(i) {
 }
 
 function setTurn(i) {
+  if (!players[i]) return;
   turn = i;
   renderPlayers();
 }
@@ -161,21 +187,13 @@ function setPlayerColor(i, color) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // 1) init 3D (важно: после DOM)
-  try {
-    initDice3D('#dice3d');
-  } catch (e) {
-    console.error('initDice3D failed:', e);
-  }
+  // init 3D
+  initDice3D('#dice3d');
 
-  // 2) palette
   renderAddPalette();
-
-  // 3) restore state
   load();
   renderPlayers();
 
-  // 4) UI events
   $('#addNick').addEventListener('click', () => addPlayer($('#nick').value));
   $('#nick').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addPlayer($('#nick').value);
@@ -219,10 +237,8 @@ window.addEventListener('DOMContentLoaded', () => {
     $('#result').textContent = '—';
 
     try {
-      // если функция не появилась — значит dice3d.js не подцепился (путь/имя/кейс)
       if (typeof window.rollDice3D !== 'function') {
-        console.error('rollDice3D missing. Check filenames: index.html / main.js / dice3d.js (case-sensitive).');
-        alert('3D не инициализирован. Проверь имена файлов и регистр: index.html / main.js / dice3d.js');
+        alert('3D не инициализирован. Проверь загрузку dice3d.js');
         return;
       }
 
@@ -236,8 +252,6 @@ window.addEventListener('DOMContentLoaded', () => {
       pushHistory({ player: p.name, color: p.color, sides, count, values });
 
       if ($('#autoNext').checked && players.length) nextTurn();
-    } catch (e) {
-      console.error('Roll failed:', e);
     } finally {
       rollingIndex = -1;
       renderPlayers();
