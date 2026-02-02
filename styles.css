@@ -7,7 +7,7 @@
   --shadow:0 18px 55px rgba(0,0,0,.55);
   --r:16px;
 
-  /* высота "стола" — ограничитель панелей */
+  /* высота стола (фикс-ограничитель для панелей) */
   --stageH: 520px;
 }
 
@@ -96,9 +96,10 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:var(--r);
   overflow:hidden;
   box-shadow:var(--shadow);
-  height: calc(var(--stageH) + 120px); /* viewport + HUD */
+  height: calc(var(--stageH) + 120px);
   min-height: calc(var(--stageH) + 120px);
 }
+
 .viewport{ height: var(--stageH); width:100%; }
 
 /* HUD */
@@ -106,6 +107,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   position:absolute;
   left:14px; bottom:14px;
   display:flex; gap:10px; flex-wrap:wrap;
+  pointer-events:none;
 }
 .hud-card{
   background:rgba(0,0,0,.28);
@@ -114,6 +116,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:14px;
   padding:10px 12px;
   min-width:180px;
+  pointer-events:none;
 }
 .hud-label{ color:var(--muted); font-size:12px; }
 .hud-value{ font-size:22px; font-weight:900; margin-top:4px; }
@@ -134,7 +137,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   box-shadow:var(--shadow);
   height: calc(var(--stageH) + 120px);
   min-height: calc(var(--stageH) + 120px);
-  overflow:hidden; /* не растёт по высоте */
+  overflow:hidden;
   display:flex;
   flex-direction:column;
 }
@@ -145,6 +148,8 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .row.small{ margin-bottom:8px; }
 .input{ flex:1; }
 .w100{ width:100%; }
+
+.subcap{ color:var(--muted); font-size:12px; margin:2px 0 8px; }
 
 /* Palette */
 .palette{
@@ -166,16 +171,17 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   outline-offset:2px;
 }
 
-/* LISTS + SCROLL */
+/* LISTS */
 .players-list, .history{
-  display:grid;
-  gap:10px;
   overflow-y:auto;
   padding-right:6px;
   flex:1;
+  display:grid;
 }
 
-/* thin scrollbar */
+.players-list{ gap:10px; }
+.history{ gap:10px; }
+
 .players-list::-webkit-scrollbar,
 .history::-webkit-scrollbar{ width:10px; }
 .players-list::-webkit-scrollbar-thumb,
@@ -190,27 +196,30 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-radius:999px;
 }
 
-/* PLAYER CARD */
+/* Player card */
 .player{
-  display:flex; align-items:center; justify-content:space-between;
+  display:flex; align-items:flex-start; justify-content:space-between;
   gap:10px;
-  padding:10px 12px;
+  padding:12px 12px;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.05);
   position:relative;
   overflow:hidden;
 }
+
 .player::before{
   content:"";
-  position:absolute; inset:0;
+  position:absolute;
+  inset:0;
   background: var(--pcolor, rgba(255,59,59,.12));
-  opacity:.26;
+  opacity: .28;
   pointer-events:none;
 }
 .player::after{
   content:"";
-  position:absolute; left:0; top:0; bottom:0;
+  position:absolute;
+  left:0; top:0; bottom:0;
   width:7px;
   background: var(--pcolor, rgba(255,59,59,.90));
   opacity:.95;
@@ -221,6 +230,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-color: rgba(255,255,255,.18);
   box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset;
 }
+
 .player.rolling{
   border-color: rgba(255,59,59,.85);
   box-shadow:
@@ -228,12 +238,15 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
     0 0 22px rgba(255,59,59,.18);
 }
 
-.player .name{ font-weight:900; position:relative; }
-.player .mini{ color:var(--muted); font-size:12px; margin-top:2px; position:relative; }
+.pmeta{ position:relative; }
+.pname{ font-weight:900; }
+.pmini{ color:var(--muted); font-size:12px; margin-top:2px; }
 
 .pactions{
-  display:flex; gap:8px; align-items:center; position:relative;
+  position:relative;
+  display:flex; gap:8px;
 }
+
 .iconbtn{
   border:1px solid rgba(255,255,255,.14);
   background:rgba(255,255,255,.06);
@@ -245,7 +258,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 }
 .iconbtn:hover{ background:rgba(255,255,255,.10); }
 
-/* HISTORY ITEM */
+/* History item */
 .item{
   background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.10);
@@ -254,8 +267,6 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 }
 .item .meta{ color:var(--muted); font-size:12px; }
 .item .vals{ margin-top:6px; font-size:16px; font-weight:900; }
-
-.rolls-toolbar{ display:flex; gap:10px; margin-bottom:10px; }
 
 .hint{
   margin-top:10px;
@@ -271,7 +282,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 }
 
 @media (max-width:1120px){
-  .main{ grid-template-columns:1fr; }
+  .main{ grid-template-columns: 1fr; }
   .panel{ height:auto; min-height:auto; }
   .stage{ height:auto; min-height:auto; }
   :root{ --stageH: 440px; }
