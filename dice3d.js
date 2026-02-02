@@ -11,17 +11,17 @@ export function initDice3D(mountSelector = '#dice3d') {
   // =========================
   const MAX_DICE = 100;
 
-  // arena + table
-  const ARENA_HALF = 12.5;
-  const TABLE_SIZE = 28;
+  // table / arena
+  const TABLE_SIZE = 30;
+  const ARENA_HALF = 13.5;
 
   // camera: почти сверху, чуть сбоку
-  const CAM_POS  = new THREE.Vector3(0, 18.0, 10.8);
+  const CAM_POS  = new THREE.Vector3(0, 20.0, 12.0);
   const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);
 
-  // dice size
-  const D6_SIZE   = 0.55;
-  const D20_SCALE = 0.62;
+  // sizes
+  const D6_SIZE = 1.10;                 // ✅ x2 от прошлых 0.55
+  const D20_SCALE = 0.62 * (2 / 3);     // ✅ уменьшить на 1/3
 
   // =========================
   // THREE
@@ -29,7 +29,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07080b);
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 250);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
   camera.position.copy(CAM_POS);
   camera.lookAt(CAM_LOOK);
 
@@ -38,25 +38,26 @@ export function initDice3D(mountSelector = '#dice3d') {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  mount.innerHTML = '';
   mount.appendChild(renderer.domElement);
 
   // lights
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
   const key = new THREE.DirectionalLight(0xffffff, 1.15);
-  key.position.set(9, 16, 6);
+  key.position.set(10, 18, 8);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.camera.near = 1;
-  key.shadow.camera.far = 60;
-  key.shadow.camera.left = -18;
-  key.shadow.camera.right = 18;
-  key.shadow.camera.top = 18;
-  key.shadow.camera.bottom = -18;
+  key.shadow.camera.far = 80;
+  key.shadow.camera.left = -20;
+  key.shadow.camera.right = 20;
+  key.shadow.camera.top = 20;
+  key.shadow.camera.bottom = -20;
   scene.add(key);
 
   const rim = new THREE.DirectionalLight(0xffffff, 0.35);
-  rim.position.set(-10, 12, -8);
+  rim.position.set(-12, 14, -10);
   scene.add(rim);
 
   // felt texture
@@ -105,7 +106,6 @@ export function initDice3D(mountSelector = '#dice3d') {
   table.receiveShadow = true;
   scene.add(table);
 
-  // resize
   function resize() {
     const w = mount.clientWidth || 600;
     const h = mount.clientHeight || 520;
@@ -148,9 +148,10 @@ export function initDice3D(mountSelector = '#dice3d') {
     world.addBody(b);
   }
 
+  // контакты (чуть меньше отскок, больше контроля)
   world.addContactMaterial(new CANNON.ContactMaterial(groundMat, diceMat, {
-    friction: 0.30,
-    restitution: 0.32,
+    friction: 0.38,
+    restitution: 0.22,
   }));
 
   // =========================
@@ -227,7 +228,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   };
 
   function createD6Mesh() {
-    const geo = new RoundedBoxGeometry(d6Size, d6Size, d6Size, 6, 0.18);
+    const geo = new RoundedBoxGeometry(d6Size, d6Size, d6Size, 6, 0.22);
     const mats = [
       new THREE.MeshStandardMaterial({ map: d6Face.px, roughness: 0.35, metalness: 0.02 }),
       new THREE.MeshStandardMaterial({ map: d6Face.nx, roughness: 0.35, metalness: 0.02 }),
@@ -246,10 +247,10 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: new CANNON.Box(new CANNON.Vec3(half, half, half)),
       material: diceMat,
-      linearDamping: 0.16,
-      angularDamping: 0.20,
+      linearDamping: 0.20,
+      angularDamping: 0.26,
       allowSleep: true,
-      sleepSpeedLimit: 0.2,
+      sleepSpeedLimit: 0.22,
       sleepTimeLimit: 0.35,
     });
   }
@@ -274,7 +275,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   // =========================
-  // D20 (gate-style: recessed triangles + centered numbers)
+  // D20 (пересборка: мраморный корпус + inset faces + центрированные цифры)
   // =========================
   const PHI = (1 + Math.sqrt(5)) / 2;
   const d20Scale = D20_SCALE;
@@ -294,11 +295,55 @@ export function initDice3D(mountSelector = '#dice3d') {
 
   const faceValue = Array.from({ length: 20 }, (_, i) => i + 1);
 
-  // body material (dark stone/metal vibe)
+  function makeMarbleTexture() {
+    const s = 512;
+    const c = document.createElement('canvas');
+    c.width = s; c.height = s;
+    const ctx = c.getContext('2d');
+
+    ctx.fillStyle = '#05060a';
+    ctx.fillRect(0, 0, s, s);
+
+    // шум + "жилки"
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = (Math.random() * 34 - 17);
+      img.data[i] = Math.max(0, Math.min(255, img.data[i] + n));
+      img.data[i+1] = Math.max(0, Math.min(255, img.data[i+1] + n));
+      img.data[i+2] = Math.max(0, Math.min(255, img.data[i+2] + n));
+      img.data[i+3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = '#e8e8f0';
+    ctx.lineWidth = 2.2;
+    for (let k = 0; k < 14; k++) {
+      ctx.beginPath();
+      let x = Math.random() * s;
+      let y = Math.random() * s;
+      ctx.moveTo(x, y);
+      for (let i = 0; i < 7; i++) {
+        x += (Math.random() * 120 - 60);
+        y += (Math.random() * 120 - 60);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 8;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1.2, 1.2);
+    return tex;
+  }
+
   const d20BodyMat = new THREE.MeshStandardMaterial({
-    color: 0x2b2e33,
-    roughness: 0.55,
-    metalness: 0.35,
+    map: makeMarbleTexture(),
+    color: 0xffffff,
+    roughness: 0.68,
+    metalness: 0.10,
   });
 
   function faceUVs() {
@@ -309,49 +354,31 @@ export function initDice3D(mountSelector = '#dice3d') {
     ]);
   }
 
-  // Centered number:
-  // width ≈ 1/3 of face base, height ≈ 1/2 of face triangle height
+  // цифра в центре грани: ширина 1/3, высота 1/2
   function makeInsetNumberTexture(n) {
     const s = 512;
     const c = document.createElement('canvas');
     c.width = s; c.height = s;
     const ctx = c.getContext('2d');
 
-    // inset base
     const g = ctx.createLinearGradient(0, 0, s, s);
-    g.addColorStop(0, '#111216');
-    g.addColorStop(1, '#07080b');
+    g.addColorStop(0, '#16171b');
+    g.addColorStop(1, '#0a0b10');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, s, s);
 
-    // subtle noise
-    const img = ctx.getImageData(0, 0, s, s);
-    for (let i = 0; i < img.data.length; i += 4) {
-      const nn = (Math.random() * 18 - 9);
-      img.data[i]   = Math.min(255, Math.max(0, img.data[i] + nn));
-      img.data[i+1] = Math.min(255, Math.max(0, img.data[i+1] + nn));
-      img.data[i+2] = Math.min(255, Math.max(0, img.data[i+2] + nn));
-    }
-    ctx.putImageData(img, 0, 0);
-
-    // rim highlight
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 14;
     ctx.strokeRect(22, 22, s - 44, s - 44);
 
-    // UV triangle points in pixels
     const A = { x: 0.08 * s, y: 0.10 * s };
     const B = { x: 0.92 * s, y: 0.10 * s };
     const Cc = { x: 0.50 * s, y: 0.92 * s };
 
-    // centroid
     const cx = (A.x + B.x + Cc.x) / 3;
     const cy = (A.y + B.y + Cc.y) / 3;
 
-    // base width
     const baseW = Math.hypot(B.x - A.x, B.y - A.y);
-
-    // triangle height from area: h = (2*Area)/base => area2/base
     const area2 = Math.abs((B.x - A.x) * (Cc.y - A.y) - (B.y - A.y) * (Cc.x - A.x));
     const triH = area2 / baseW;
 
@@ -363,7 +390,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    let fontSize = Math.max(22, targetH);
+    let fontSize = Math.max(20, targetH);
     for (let k = 0; k < 3; k++) {
       ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
       const m = ctx.measureText(text);
@@ -373,17 +400,17 @@ export function initDice3D(mountSelector = '#dice3d') {
         : fontSize;
 
       const scale = Math.min(targetW / measuredW, targetH / measuredH);
-      fontSize = Math.max(16, fontSize * scale);
+      fontSize = Math.max(14, fontSize * scale);
     }
 
     ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
 
-    // engraved-ish white numbers
-    ctx.fillStyle = 'rgba(0,0,0,0.60)';
-    ctx.fillText(text, cx + 2.2, cy + 4.0);
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.fillText(text, cx - 1.6, cy - 2.6);
-    ctx.fillStyle = '#e6e7ea';
+    // “врезка”
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillText(text, cx + 2.0, cy + 3.6);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillText(text, cx - 1.4, cy - 2.2);
+    ctx.fillStyle = '#f1f2f6';
     ctx.fillText(text, cx, cy);
 
     const tex = new THREE.CanvasTexture(c);
@@ -394,10 +421,10 @@ export function initDice3D(mountSelector = '#dice3d') {
   function createD20Mesh() {
     const group = new THREE.Group();
 
-    // body
+    // корпус (подсглаженный свет)
     const bodyGeo = new THREE.IcosahedronGeometry(d20Scale, 0);
 
-    // smoother lighting (fake rounding)
+    // “круглее” шейдинг: нормали как у сферы
     {
       const pos = bodyGeo.attributes.position.array;
       const normals = new Float32Array(pos.length);
@@ -413,8 +440,8 @@ export function initDice3D(mountSelector = '#dice3d') {
     body.castShadow = true;
     group.add(body);
 
-    // recessed inserts
-    const insetDepth = d20Scale * 0.075;
+    // inset faces
+    const insetDepth = d20Scale * 0.085;
     const insetShrink = 0.86;
 
     for (let i = 0; i < F.length; i++) {
@@ -450,8 +477,8 @@ export function initDice3D(mountSelector = '#dice3d') {
 
       const mat = new THREE.MeshStandardMaterial({
         map: makeInsetNumberTexture(faceValue[i]),
-        roughness: 0.85,
-        metalness: 0.06,
+        roughness: 0.90,
+        metalness: 0.02,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -1,
@@ -472,10 +499,10 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: poly,
       material: diceMat,
-      linearDamping: 0.12,
-      angularDamping: 0.16,
+      linearDamping: 0.18,     // ✅ больше демпфирования — меньше “улетает”
+      angularDamping: 0.22,
       allowSleep: true,
-      sleepSpeedLimit: 0.2,
+      sleepSpeedLimit: 0.22,
       sleepTimeLimit: 0.35,
     });
   }
@@ -522,41 +549,40 @@ export function initDice3D(mountSelector = '#dice3d') {
     dice.length = 0;
   }
 
+  // спавн ближе к центру (спираль), чтобы d20 не “разлетался от центра”
   function spawnDice({ sides, count }) {
     clearDice();
 
-    const safeCount = Math.max(1, Math.min(MAX_DICE, count));
-    const cols = Math.ceil(Math.sqrt(safeCount));
-    const rows = Math.ceil(safeCount / cols);
+    const n = Math.max(1, Math.min(MAX_DICE, count));
+    const type = (sides === 6) ? 'd6' : 'd20';
 
-    const spacing = (sides === 6)
-      ? (d6Size * 1.25)
-      : (d20Scale * 1.35);
+    const baseSize = (type === 'd6') ? d6Size : d20Scale;
+    const baseSpacing = baseSize * ((type === 'd6') ? 1.15 : 1.35);
 
-    const startX = -((cols - 1) * spacing) / 2;
-    const startZ = -((rows - 1) * spacing) / 2;
+    // радиус “пятна” спавна растёт от количества, но не до краёв арены
+    const Rmax = ARENA_HALF * 0.55;
+    const R = Math.min(Rmax, baseSpacing * Math.sqrt(n) * 0.45);
 
-    for (let i = 0; i < safeCount; i++) {
-      const type = (sides === 6) ? 'd6' : (sides === 20) ? 'd20' : 'other';
+    // golden angle spiral
+    const golden = Math.PI * (3 - Math.sqrt(5));
+
+    for (let i = 0; i < n; i++) {
       let mesh, body;
 
       if (type === 'd6') { mesh = createD6Mesh(); body = createD6Body(); }
-      else if (type === 'd20') { mesh = createD20Mesh(); body = createD20Body(); }
-      else { continue; }
+      else { mesh = createD20Mesh(); body = createD20Body(); }
 
-      const r = Math.floor(i / cols);
-      const c = i % cols;
+      const t = (n === 1) ? 0 : (i / (n - 1));
+      const radius = Math.sqrt(t) * R;
+      const angle = i * golden;
 
-      const x = startX + c * spacing;
-      const z = startZ + r * spacing;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
 
-      const jx = (Math.random() - 0.5) * spacing * 0.10;
-      const jz = (Math.random() - 0.5) * spacing * 0.10;
+      const y = 4.4 + Math.random() * 0.6;
 
-      const y = 4.8 + Math.random() * 0.7;
-
-      mesh.position.set(x + jx, y, z + jz);
-      body.position.set(x + jx, y, z + jz);
+      mesh.position.set(x, y, z);
+      body.position.set(x, y, z);
 
       const q = new THREE.Quaternion().setFromEuler(
         Math.random() * Math.PI,
@@ -572,31 +598,46 @@ export function initDice3D(mountSelector = '#dice3d') {
     }
   }
 
+  // симметричный “кик” + лёгкое втягивание к центру
   function kickDice() {
     for (const d of dice) {
-      const impulse = new CANNON.Vec3(
-        (Math.random() * 2 - 1) * 0.9,
-        0,
-        -2.0 - Math.random() * 0.8
-      );
+      const isD6 = d.type === 'd6';
+      const mag = isD6 ? 1.25 : 0.85;          // d20 слабее
+      const spin = isD6 ? 7.0 : 6.0;
+
+      const rx = (Math.random() * 2 - 1);
+      const rz = (Math.random() * 2 - 1);
+
+      // базовый импульс (без постоянного “в одну сторону”)
+      let ix = rx * mag;
+      let iz = rz * mag;
+
+      // лёгкое втягивание к центру
+      const cx = -d.body.position.x;
+      const cz = -d.body.position.z;
+      const len = Math.hypot(cx, cz) || 1;
+      ix += (cx / len) * 0.22;
+      iz += (cz / len) * 0.22;
+
+      const impulse = new CANNON.Vec3(ix, 0.0, iz);
 
       const point = new CANNON.Vec3(
-        (Math.random() * 2 - 1) * 0.08,
-        (Math.random() * 2 - 1) * 0.08,
-        (Math.random() * 2 - 1) * 0.08
+        (Math.random() * 2 - 1) * 0.06,
+        (Math.random() * 2 - 1) * 0.06,
+        (Math.random() * 2 - 1) * 0.06
       );
 
       d.body.applyImpulse(impulse, d.body.position.vadd(point));
       d.body.angularVelocity.set(
-        (Math.random() * 2 - 1) * 6,
-        (Math.random() * 2 - 1) * 6,
-        (Math.random() * 2 - 1) * 6
+        (Math.random() * 2 - 1) * spin,
+        (Math.random() * 2 - 1) * spin,
+        (Math.random() * 2 - 1) * spin
       );
       d.body.wakeUp();
     }
   }
 
-  async function waitStop(timeoutMs = 3800) {
+  async function waitStop(timeoutMs = 4200) {
     const start = performance.now();
     await new Promise((resolve) => {
       const t = setInterval(() => {
@@ -606,7 +647,7 @@ export function initDice3D(mountSelector = '#dice3d') {
           clearInterval(t);
           resolve();
         }
-      }, 60);
+      }, 70);
     });
   }
 
@@ -640,19 +681,15 @@ export function initDice3D(mountSelector = '#dice3d') {
   // =========================
   window.rollDice3D = async ({ sides = 6, count = 1 } = {}) => {
     const safeCount = Math.max(1, Math.min(MAX_DICE, count));
+    const s = (sides === 20) ? 20 : 6; // поддерживаем только d6/d20
 
-    if (![6, 20].includes(sides)) {
-      return Array.from({ length: safeCount }, () => 1 + Math.floor(Math.random() * sides));
-    }
-
-    spawnDice({ sides, count: safeCount });
+    spawnDice({ sides: s, count: safeCount });
     kickDice();
     await waitStop();
 
     return dice.map(d => {
       if (d.type === 'd6') return getD6UpValue(d.mesh);
-      if (d.type === 'd20') return getD20UpValue(d.mesh);
-      return 0;
+      return getD20UpValue(d.mesh);
     });
   };
 }
