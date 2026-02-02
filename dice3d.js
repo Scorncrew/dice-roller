@@ -20,8 +20,12 @@ export function initDice3D(mountSelector = '#dice3d') {
   const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);
 
   // sizes
-  const D6_SIZE = 1.10;                 // ✅ x2 от прошлых 0.55
-  const D20_SCALE = 0.62 * (2 / 3);     // ✅ уменьшить на 1/3
+  const D6_SIZE = 1.10;                 // x2 от старого
+  const D20_SCALE = 0.62 * (2 / 3);     // d20 меньше на 1/3
+
+  // default throw
+  const THROW_MIN = 0.6;
+  const THROW_MAX = 6.0;
 
   // =========================
   // THREE
@@ -133,13 +137,13 @@ export function initDice3D(mountSelector = '#dice3d') {
     quaternion: new CANNON.Quaternion().setFromEuler(-Math.PI / 2, 0, 0),
   }));
 
-  // walls
+  // 4 invisible walls (planes)
   const wallShape = new CANNON.Plane();
   const walls = [
-    { pos: [0, 0, -ARENA_HALF], rot: [0, 0, 0] },
-    { pos: [0, 0,  ARENA_HALF], rot: [0, Math.PI, 0] },
-    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI / 2, 0] },
-    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI / 2, 0] },
+    { pos: [0, 0, -ARENA_HALF], rot: [0, 0, 0] },             // north
+    { pos: [0, 0,  ARENA_HALF], rot: [0, Math.PI, 0] },       // south
+    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI / 2, 0] },   // west
+    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI / 2, 0] },  // east
   ];
   for (const w of walls) {
     const b = new CANNON.Body({ mass: 0, shape: wallShape, material: groundMat });
@@ -148,11 +152,36 @@ export function initDice3D(mountSelector = '#dice3d') {
     world.addBody(b);
   }
 
-  // контакты (чуть меньше отскок, больше контроля)
+  // более “скачущие” кубики
   world.addContactMaterial(new CANNON.ContactMaterial(groundMat, diceMat, {
-    friction: 0.38,
-    restitution: 0.22,
+    friction: 0.22,
+    restitution: 0.55,  // ✅ выше отскок
   }));
+
+  // =========================
+  // Utilities: screen drag -> world XZ direction (relative to camera)
+  // =========================
+  function screenDragToWorldDir(dx, dy) {
+    // dx, dy: pixels; dy positive = down
+    // use camera right + camera forward projected to XZ plane
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+
+    right.y = 0;
+    forward.y = 0;
+    right.normalize();
+    forward.normalize();
+
+    // Drag up should throw "forward", so invert dy
+    const v = right.multiplyScalar(dx).add(forward.multiplyScalar(-dy));
+    v.y = 0;
+    const len = v.length();
+    if (len < 1e-6) return new CANNON.Vec3(0, 0, -1);
+    v.normalize();
+    return new CANNON.Vec3(v.x, 0, v.z);
+  }
+
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
   // =========================
   // D6 (casino white + red pips)
@@ -230,12 +259,12 @@ export function initDice3D(mountSelector = '#dice3d') {
   function createD6Mesh() {
     const geo = new RoundedBoxGeometry(d6Size, d6Size, d6Size, 6, 0.22);
     const mats = [
-      new THREE.MeshStandardMaterial({ map: d6Face.px, roughness: 0.35, metalness: 0.02 }),
-      new THREE.MeshStandardMaterial({ map: d6Face.nx, roughness: 0.35, metalness: 0.02 }),
-      new THREE.MeshStandardMaterial({ map: d6Face.py, roughness: 0.35, metalness: 0.02 }),
-      new THREE.MeshStandardMaterial({ map: d6Face.ny, roughness: 0.35, metalness: 0.02 }),
-      new THREE.MeshStandardMaterial({ map: d6Face.pz, roughness: 0.35, metalness: 0.02 }),
-      new THREE.MeshStandardMaterial({ map: d6Face.nz, roughness: 0.35, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.px, roughness: 0.33, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.nx, roughness: 0.33, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.py, roughness: 0.33, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.ny, roughness: 0.33, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.pz, roughness: 0.33, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ map: d6Face.nz, roughness: 0.33, metalness: 0.02 }),
     ];
     const mesh = new THREE.Mesh(geo, mats);
     mesh.castShadow = true;
@@ -247,11 +276,11 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: new CANNON.Box(new CANNON.Vec3(half, half, half)),
       material: diceMat,
-      linearDamping: 0.20,
-      angularDamping: 0.26,
+      linearDamping: 0.08,  // ✅ меньше демпф — больше “скачет”
+      angularDamping: 0.10,
       allowSleep: true,
-      sleepSpeedLimit: 0.22,
-      sleepTimeLimit: 0.35,
+      sleepSpeedLimit: 0.24,
+      sleepTimeLimit: 0.45,
     });
   }
 
@@ -275,7 +304,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   // =========================
-  // D20 (пересборка: мраморный корпус + inset faces + центрированные цифры)
+  // D20 (mраморный корпус + inset faces + центрированные цифры)
   // =========================
   const PHI = (1 + Math.sqrt(5)) / 2;
   const d20Scale = D20_SCALE;
@@ -304,7 +333,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     ctx.fillStyle = '#05060a';
     ctx.fillRect(0, 0, s, s);
 
-    // шум + "жилки"
     const img = ctx.getImageData(0, 0, s, s);
     for (let i = 0; i < img.data.length; i += 4) {
       const n = (Math.random() * 34 - 17);
@@ -342,7 +370,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   const d20BodyMat = new THREE.MeshStandardMaterial({
     map: makeMarbleTexture(),
     color: 0xffffff,
-    roughness: 0.68,
+    roughness: 0.62,
     metalness: 0.10,
   });
 
@@ -354,7 +382,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     ]);
   }
 
-  // цифра в центре грани: ширина 1/3, высота 1/2
   function makeInsetNumberTexture(n) {
     const s = 512;
     const c = document.createElement('canvas');
@@ -398,14 +425,12 @@ export function initDice3D(mountSelector = '#dice3d') {
       const measuredH = (m.actualBoundingBoxAscent && m.actualBoundingBoxDescent)
         ? (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent)
         : fontSize;
-
       const scale = Math.min(targetW / measuredW, targetH / measuredH);
       fontSize = Math.max(14, fontSize * scale);
     }
 
     ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
 
-    // “врезка”
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillText(text, cx + 2.0, cy + 3.6);
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
@@ -421,7 +446,6 @@ export function initDice3D(mountSelector = '#dice3d') {
   function createD20Mesh() {
     const group = new THREE.Group();
 
-    // корпус (подсглаженный свет)
     const bodyGeo = new THREE.IcosahedronGeometry(d20Scale, 0);
 
     // “круглее” шейдинг: нормали как у сферы
@@ -499,11 +523,11 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: poly,
       material: diceMat,
-      linearDamping: 0.18,     // ✅ больше демпфирования — меньше “улетает”
-      angularDamping: 0.22,
+      linearDamping: 0.06,  // ✅ меньше демпф — больше “скачет”
+      angularDamping: 0.10,
       allowSleep: true,
-      sleepSpeedLimit: 0.22,
-      sleepTimeLimit: 0.35,
+      sleepSpeedLimit: 0.24,
+      sleepTimeLimit: 0.45,
     });
   }
 
@@ -549,26 +573,20 @@ export function initDice3D(mountSelector = '#dice3d') {
     dice.length = 0;
   }
 
-  // спавн ближе к центру (спираль), чтобы d20 не “разлетался от центра”
+  // start zone near center
   function spawnDice({ sides, count }) {
     clearDice();
 
     const n = Math.max(1, Math.min(MAX_DICE, count));
     const type = (sides === 6) ? 'd6' : 'd20';
 
-    const baseSize = (type === 'd6') ? d6Size : d20Scale;
-    const baseSpacing = baseSize * ((type === 'd6') ? 1.15 : 1.35);
+    const size = (type === 'd6') ? d6Size : d20Scale;
+    const R = Math.min(ARENA_HALF * 0.30, size * 0.65 * Math.sqrt(n));
 
-    // радиус “пятна” спавна растёт от количества, но не до краёв арены
-    const Rmax = ARENA_HALF * 0.55;
-    const R = Math.min(Rmax, baseSpacing * Math.sqrt(n) * 0.45);
-
-    // golden angle spiral
     const golden = Math.PI * (3 - Math.sqrt(5));
 
     for (let i = 0; i < n; i++) {
       let mesh, body;
-
       if (type === 'd6') { mesh = createD6Mesh(); body = createD6Body(); }
       else { mesh = createD20Mesh(); body = createD20Body(); }
 
@@ -578,8 +596,7 @@ export function initDice3D(mountSelector = '#dice3d') {
 
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
-
-      const y = 4.4 + Math.random() * 0.6;
+      const y = 5.2 + Math.random() * 0.8;
 
       mesh.position.set(x, y, z);
       body.position.set(x, y, z);
@@ -598,33 +615,50 @@ export function initDice3D(mountSelector = '#dice3d') {
     }
   }
 
-  // симметричный “кик” + лёгкое втягивание к центру
-  function kickDice() {
+  function kickDice(throwCfg) {
+    // throwCfg: { dx, dy } pixels OR { dir: CANNON.Vec3, strength: number }
+    let dir = null;
+    let strength = null;
+
+    if (throwCfg && typeof throwCfg.dx === 'number' && typeof throwCfg.dy === 'number') {
+      const len = Math.hypot(throwCfg.dx, throwCfg.dy);
+      dir = screenDragToWorldDir(throwCfg.dx, throwCfg.dy);
+      strength = clamp(len / 65, THROW_MIN, THROW_MAX);
+    } else if (throwCfg && throwCfg.dir && typeof throwCfg.strength === 'number') {
+      dir = throwCfg.dir;
+      strength = clamp(throwCfg.strength, THROW_MIN, THROW_MAX);
+    } else {
+      // fallback random direction
+      const a = Math.random() * Math.PI * 2;
+      dir = new CANNON.Vec3(Math.cos(a), 0, Math.sin(a));
+      strength = 2.4;
+    }
+
     for (const d of dice) {
       const isD6 = d.type === 'd6';
-      const mag = isD6 ? 1.25 : 0.85;          // d20 слабее
-      const spin = isD6 ? 7.0 : 6.0;
+      const mag = strength * (isD6 ? 1.0 : 0.95);
+      const spin = (isD6 ? 10.0 : 9.0);
 
-      const rx = (Math.random() * 2 - 1);
-      const rz = (Math.random() * 2 - 1);
+      // small per-die randomness so they don't move as one block
+      const jitter = 0.22;
+      const jx = (Math.random() * 2 - 1) * jitter;
+      const jz = (Math.random() * 2 - 1) * jitter;
 
-      // базовый импульс (без постоянного “в одну сторону”)
-      let ix = rx * mag;
-      let iz = rz * mag;
-
-      // лёгкое втягивание к центру
+      // slight center pull to avoid drifting to walls
       const cx = -d.body.position.x;
       const cz = -d.body.position.z;
-      const len = Math.hypot(cx, cz) || 1;
-      ix += (cx / len) * 0.22;
-      iz += (cz / len) * 0.22;
+      const clen = Math.hypot(cx, cz) || 1;
+      const pull = 0.12;
+
+      const ix = (dir.x + jx) * mag + (cx / clen) * pull;
+      const iz = (dir.z + jz) * mag + (cz / clen) * pull;
 
       const impulse = new CANNON.Vec3(ix, 0.0, iz);
 
       const point = new CANNON.Vec3(
-        (Math.random() * 2 - 1) * 0.06,
-        (Math.random() * 2 - 1) * 0.06,
-        (Math.random() * 2 - 1) * 0.06
+        (Math.random() * 2 - 1) * 0.08,
+        (Math.random() * 2 - 1) * 0.08,
+        (Math.random() * 2 - 1) * 0.08
       );
 
       d.body.applyImpulse(impulse, d.body.position.vadd(point));
@@ -637,7 +671,7 @@ export function initDice3D(mountSelector = '#dice3d') {
     }
   }
 
-  async function waitStop(timeoutMs = 4200) {
+  async function waitStop(timeoutMs = 5200) {
     const start = performance.now();
     await new Promise((resolve) => {
       const t = setInterval(() => {
@@ -647,7 +681,7 @@ export function initDice3D(mountSelector = '#dice3d') {
           clearInterval(t);
           resolve();
         }
-      }, 70);
+      }, 80);
     });
   }
 
@@ -679,12 +713,12 @@ export function initDice3D(mountSelector = '#dice3d') {
   // =========================
   // Public API
   // =========================
-  window.rollDice3D = async ({ sides = 6, count = 1 } = {}) => {
+  window.rollDice3D = async ({ sides = 6, count = 1, throwCfg = null } = {}) => {
     const safeCount = Math.max(1, Math.min(MAX_DICE, count));
-    const s = (sides === 20) ? 20 : 6; // поддерживаем только d6/d20
+    const s = (sides === 20) ? 20 : 6;
 
     spawnDice({ sides: s, count: safeCount });
-    kickDice();
+    kickDice(throwCfg);
     await waitStop();
 
     return dice.map(d => {
@@ -692,4 +726,8 @@ export function initDice3D(mountSelector = '#dice3d') {
       return getD20UpValue(d.mesh);
     });
   };
+
+  // optional helper (если захочешь)
+  window.__dice3d_camera = camera;
+  window.__dice3d_renderer = renderer;
 }
