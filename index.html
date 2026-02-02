@@ -13,7 +13,7 @@
         <div class="dot"></div>
         <div>
           <div class="title">Dice Roller</div>
-          <div class="subtitle">d6 казино • d20 прототип • очередь игроков</div>
+          <div class="subtitle">d6 казино • d20 gate-style • очередь игроков</div>
         </div>
       </div>
 
@@ -42,7 +42,7 @@
     </header>
 
     <main class="main">
-      <!-- LEFT -->
+      <!-- LEFT: PLAYERS -->
       <aside class="panel">
         <div class="panel-title">Игроки</div>
 
@@ -51,7 +51,8 @@
           <button id="addNick" class="btn">➕</button>
         </div>
 
-        <div class="palette" id="addPalette" title="Выбери цвет для нового игрока"></div>
+        <div class="subcap">Цвет нового игрока</div>
+        <div id="addPalette" class="palette" aria-label="Палитра цвета игрока"></div>
 
         <div class="row small">
           <button id="clearPlayers" class="btn ghost w100">🧹 Очистить игроков</button>
@@ -60,11 +61,11 @@
         <div id="players" class="players-list"></div>
 
         <div class="hint">
-          🎯 — сделать текущим • 🗑️ — удалить • цвет — кликом по палитре
+          🎯 — сделать текущим • 🗑️ — удалить • цвет: палитра в карточке
         </div>
       </aside>
 
-      <!-- CENTER -->
+      <!-- CENTER: TABLE -->
       <section class="stage">
         <div id="dice3d" class="viewport"></div>
 
@@ -81,18 +82,18 @@
         </div>
       </section>
 
-      <!-- RIGHT -->
+      <!-- RIGHT: HISTORY -->
       <aside class="panel">
         <div class="panel-title">Броски</div>
 
-        <div class="rolls-toolbar">
-          <button id="clearHistory" class="btn ghost">🧹 Очистить</button>
+        <div class="row small">
+          <button id="clearHistory" class="btn ghost w100">🧹 Очистить историю</button>
         </div>
 
         <div id="history" class="history"></div>
 
         <div class="hint">
-          История фиксирована по высоте стола и скроллится.
+          История не растягивает страницу — только скролл.
         </div>
       </aside>
     </main>
