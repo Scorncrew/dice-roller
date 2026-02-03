@@ -1,29 +1,30 @@
 import * as THREE from 'https://esm.sh/three@0.161.0';
-import { RoundedBoxGeometry } from 'https://esm.sh/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { RoundedBoxGeometry } from 'https://esm.sh/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometryGeometry.js'.catch?.(() => null);
+// ↑ на всякий: если импорт сломается, ниже дублирую правильный:
+import { RoundedBoxGeometry as _RoundedBoxGeometry } from 'https://esm.sh/three@0.161.0/examples/jsm/geometries/RoundedBoxGeometry.js';
 import * as CANNON from 'https://esm.sh/cannon-es@0.20.0';
+
+const RoundedBox = _RoundedBoxGeometry;
 
 export function initDice3D(mountSelector = '#dice3d') {
   const mount = document.querySelector(mountSelector);
   if (!mount) throw new Error(`Mount not found: ${mountSelector}`);
 
-  // =========================
-  // TUNING
-  // =========================
   const MAX_DICE = 100;
 
   // table / arena
   const TABLE_SIZE = 30;
   const ARENA_HALF = 13.5;
 
-  // camera: почти сверху, чуть сбоку
+  // camera
   const CAM_POS  = new THREE.Vector3(0, 20.0, 12.0);
   const CAM_LOOK = new THREE.Vector3(0, 0.5, 0);
 
   // sizes
-  const D6_SIZE = 1.10;                 // x2 от старого
-  const D20_SCALE = 0.62 * (2 / 3);     // d20 меньше на 1/3
+  const D6_SIZE = 1.10;
+  const D20_SCALE = 0.62 * (2 / 3);
 
-  // default throw
+  // throw
   const THROW_MIN = 0.6;
   const THROW_MAX = 6.0;
 
@@ -42,10 +43,10 @@ export function initDice3D(mountSelector = '#dice3d') {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+
   mount.innerHTML = '';
   mount.appendChild(renderer.domElement);
 
-  // lights
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
   const key = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -64,7 +65,6 @@ export function initDice3D(mountSelector = '#dice3d') {
   rim.position.set(-12, 14, -10);
   scene.add(rim);
 
-  // felt texture
   function makeFeltTexture() {
     const s = 512;
     const c = document.createElement('canvas');
@@ -129,7 +129,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   const groundMat = new CANNON.Material('ground');
   const diceMat = new CANNON.Material('dice');
 
-  // ground
+  // ground plane
   world.addBody(new CANNON.Body({
     mass: 0,
     shape: new CANNON.Plane(),
@@ -137,54 +137,73 @@ export function initDice3D(mountSelector = '#dice3d') {
     quaternion: new CANNON.Quaternion().setFromEuler(-Math.PI / 2, 0, 0),
   }));
 
-  // 4 invisible walls (planes)
-  const wallShape = new CANNON.Plane();
-  const walls = [
-    { pos: [0, 0, -ARENA_HALF], rot: [0, 0, 0] },             // north
-    { pos: [0, 0,  ARENA_HALF], rot: [0, Math.PI, 0] },       // south
-    { pos: [-ARENA_HALF, 0, 0], rot: [0, Math.PI / 2, 0] },   // west
-    { pos: [ ARENA_HALF, 0, 0], rot: [0, -Math.PI / 2, 0] },  // east
-  ];
-  for (const w of walls) {
-    const b = new CANNON.Body({ mass: 0, shape: wallShape, material: groundMat });
-    b.position.set(...w.pos);
-    b.quaternion.setFromEuler(...w.rot);
-    world.addBody(b);
+  // ✅ реальные стенки-коробки (невидимые) — держат кубы со всех 4 сторон
+  const WALL_THICK = 0.9;
+  const WALL_HEIGHT = 6.0;
+
+  function addWallBox({ x, z, hx, hz }) {
+    const body = new CANNON.Body({ mass: 0, material: groundMat });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(hx, WALL_HEIGHT / 2, hz)));
+    body.position.set(x, WALL_HEIGHT / 2, z);
+    world.addBody(body);
+    return body;
   }
 
-  // более “скачущие” кубики
+  // North/South (по Z)
+  addWallBox({
+    x: 0,
+    z: -(ARENA_HALF + WALL_THICK / 2),
+    hx: (ARENA_HALF + WALL_THICK) ,
+    hz: WALL_THICK / 2
+  });
+  addWallBox({
+    x: 0,
+    z: (ARENA_HALF + WALL_THICK / 2),
+    hx: (ARENA_HALF + WALL_THICK),
+    hz: WALL_THICK / 2
+  });
+
+  // West/East (по X)
+  addWallBox({
+    x: -(ARENA_HALF + WALL_THICK / 2),
+    z: 0,
+    hx: WALL_THICK / 2,
+    hz: (ARENA_HALF + WALL_THICK)
+  });
+  addWallBox({
+    x: (ARENA_HALF + WALL_THICK / 2),
+    z: 0,
+    hx: WALL_THICK / 2,
+    hz: (ARENA_HALF + WALL_THICK)
+  });
+
+  // "скачут"
   world.addContactMaterial(new CANNON.ContactMaterial(groundMat, diceMat, {
     friction: 0.22,
-    restitution: 0.55,  // ✅ выше отскок
+    restitution: 0.58,
   }));
 
-  // =========================
-  // Utilities: screen drag -> world XZ direction (relative to camera)
-  // =========================
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+  // drag -> dir (camera space projected to XZ)
   function screenDragToWorldDir(dx, dy) {
-    // dx, dy: pixels; dy positive = down
-    // use camera right + camera forward projected to XZ plane
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
 
-    right.y = 0;
-    forward.y = 0;
-    right.normalize();
-    forward.normalize();
+    right.y = 0; forward.y = 0;
+    right.normalize(); forward.normalize();
 
-    // Drag up should throw "forward", so invert dy
     const v = right.multiplyScalar(dx).add(forward.multiplyScalar(-dy));
     v.y = 0;
+
     const len = v.length();
     if (len < 1e-6) return new CANNON.Vec3(0, 0, -1);
     v.normalize();
     return new CANNON.Vec3(v.x, 0, v.z);
   }
 
-  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
   // =========================
-  // D6 (casino white + red pips)
+  // D6
   // =========================
   const d6Size = D6_SIZE;
   const half = d6Size / 2;
@@ -246,7 +265,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     return tex;
   }
 
-  // +Y:1, -Y:6, +X:3, -X:4, +Z:2, -Z:5
   const d6Face = {
     px: makePipFaceTexture(3),
     nx: makePipFaceTexture(4),
@@ -257,7 +275,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   };
 
   function createD6Mesh() {
-    const geo = new RoundedBoxGeometry(d6Size, d6Size, d6Size, 6, 0.22);
+    const geo = new RoundedBox(d6Size, d6Size, d6Size, 6, 0.22);
     const mats = [
       new THREE.MeshStandardMaterial({ map: d6Face.px, roughness: 0.33, metalness: 0.02 }),
       new THREE.MeshStandardMaterial({ map: d6Face.nx, roughness: 0.33, metalness: 0.02 }),
@@ -276,7 +294,7 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: new CANNON.Box(new CANNON.Vec3(half, half, half)),
       material: diceMat,
-      linearDamping: 0.08,  // ✅ меньше демпф — больше “скачет”
+      linearDamping: 0.08,
       angularDamping: 0.10,
       allowSleep: true,
       sleepSpeedLimit: 0.24,
@@ -304,7 +322,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   // =========================
-  // D20 (mраморный корпус + inset faces + центрированные цифры)
+  // D20
   // =========================
   const PHI = (1 + Math.sqrt(5)) / 2;
   const d20Scale = D20_SCALE;
@@ -375,11 +393,7 @@ export function initDice3D(mountSelector = '#dice3d') {
   });
 
   function faceUVs() {
-    return new Float32Array([
-      0.08, 0.10,
-      0.92, 0.10,
-      0.50, 0.92,
-    ]);
+    return new Float32Array([ 0.08,0.10, 0.92,0.10, 0.50,0.92 ]);
   }
 
   function makeInsetNumberTexture(n) {
@@ -448,7 +462,7 @@ export function initDice3D(mountSelector = '#dice3d') {
 
     const bodyGeo = new THREE.IcosahedronGeometry(d20Scale, 0);
 
-    // “круглее” шейдинг: нормали как у сферы
+    // sphere-like normals
     {
       const pos = bodyGeo.attributes.position.array;
       const normals = new Float32Array(pos.length);
@@ -464,7 +478,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     body.castShadow = true;
     group.add(body);
 
-    // inset faces
     const insetDepth = d20Scale * 0.085;
     const insetShrink = 0.86;
 
@@ -523,7 +536,7 @@ export function initDice3D(mountSelector = '#dice3d') {
       mass: 1,
       shape: poly,
       material: diceMat,
-      linearDamping: 0.06,  // ✅ меньше демпф — больше “скачет”
+      linearDamping: 0.06,
       angularDamping: 0.10,
       allowSleep: true,
       sleepSpeedLimit: 0.24,
@@ -552,10 +565,7 @@ export function initDice3D(mountSelector = '#dice3d') {
       const worldN = n.applyQuaternion(q);
       const d = worldN.dot(up);
 
-      if (d > bestDot) {
-        bestDot = d;
-        bestFace = i;
-      }
+      if (d > bestDot) { bestDot = d; bestFace = i; }
     }
     return faceValue[bestFace];
   }
@@ -573,7 +583,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     dice.length = 0;
   }
 
-  // start zone near center
   function spawnDice({ sides, count }) {
     clearDice();
 
@@ -616,7 +625,6 @@ export function initDice3D(mountSelector = '#dice3d') {
   }
 
   function kickDice(throwCfg) {
-    // throwCfg: { dx, dy } pixels OR { dir: CANNON.Vec3, strength: number }
     let dir = null;
     let strength = null;
 
@@ -624,11 +632,7 @@ export function initDice3D(mountSelector = '#dice3d') {
       const len = Math.hypot(throwCfg.dx, throwCfg.dy);
       dir = screenDragToWorldDir(throwCfg.dx, throwCfg.dy);
       strength = clamp(len / 65, THROW_MIN, THROW_MAX);
-    } else if (throwCfg && throwCfg.dir && typeof throwCfg.strength === 'number') {
-      dir = throwCfg.dir;
-      strength = clamp(throwCfg.strength, THROW_MIN, THROW_MAX);
     } else {
-      // fallback random direction
       const a = Math.random() * Math.PI * 2;
       dir = new CANNON.Vec3(Math.cos(a), 0, Math.sin(a));
       strength = 2.4;
@@ -639,12 +643,10 @@ export function initDice3D(mountSelector = '#dice3d') {
       const mag = strength * (isD6 ? 1.0 : 0.95);
       const spin = (isD6 ? 10.0 : 9.0);
 
-      // small per-die randomness so they don't move as one block
       const jitter = 0.22;
       const jx = (Math.random() * 2 - 1) * jitter;
       const jz = (Math.random() * 2 - 1) * jitter;
 
-      // slight center pull to avoid drifting to walls
       const cx = -d.body.position.x;
       const cz = -d.body.position.z;
       const clen = Math.hypot(cx, cz) || 1;
@@ -721,13 +723,6 @@ export function initDice3D(mountSelector = '#dice3d') {
     kickDice(throwCfg);
     await waitStop();
 
-    return dice.map(d => {
-      if (d.type === 'd6') return getD6UpValue(d.mesh);
-      return getD20UpValue(d.mesh);
-    });
+    return dice.map(d => (d.type === 'd6') ? getD6UpValue(d.mesh) : getD20UpValue(d.mesh));
   };
-
-  // optional helper (если захочешь)
-  window.__dice3d_camera = camera;
-  window.__dice3d_renderer = renderer;
 }
