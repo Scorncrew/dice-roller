@@ -11,6 +11,9 @@
 
   --playerSlots: 6;
   --playerGap: 10px;
+
+  /* гарантированная высота слота игрока (чтобы 6 карточек влазили) */
+  --playerSlotH: 96px;
 }
 
 *{ box-sizing:border-box; }
@@ -105,8 +108,8 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .viewport{
   height: var(--stageH);
   width:100%;
-  position:relative; /* for overlay */
-  touch-action:none; /* drag without scroll */
+  position:relative;
+  touch-action:none;
   user-select:none;
 }
 
@@ -159,7 +162,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 
 .subcap{ color:var(--muted); font-size:12px; margin:2px 0 8px; }
 
-/* Palette */
+/* Palette (общая, для добавления игрока) */
 .palette{
   display:flex;
   flex-wrap:wrap;
@@ -179,18 +182,19 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   outline-offset:2px;
 }
 
-/* PLAYERS: 6 slots fixed */
+/* PLAYERS: 6 fixed slots */
 .players-list{
   display:grid;
-  grid-template-rows: repeat(var(--playerSlots), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--playerSlots), var(--playerSlotH));
   gap: var(--playerGap);
   flex: 1;
-  overflow: hidden;
+  overflow: hidden; /* никакого вертикального скролла */
 }
 
+/* card */
 .player{
   height: 100%;
-  min-height: 78px;
+  min-height: 0;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.05);
@@ -201,7 +205,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   align-items:flex-start;
   justify-content:space-between;
   gap:10px;
-  padding:10px 12px;
+  padding:10px 10px;
 }
 
 .player::before{
@@ -239,45 +243,78 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   border-style: dashed;
 }
 .player.placeholder::before,
-.player.placeholder::after{
-  opacity: .08;
+.player.placeholder::after{ opacity: .08; }
+
+/* meta must shrink for ellipsis */
+.pmeta{
+  position:relative;
+  min-width: 0;
+  flex: 1;
 }
 
-.pmeta{ position:relative; }
-.pname{ font-weight:900; }
-.pmini{ color:var(--muted); font-size:12px; margin-top:2px; }
+.pname{
+  font-weight:900;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* ✅ длинные ники не ломают карточку */
+}
 
+.pmini{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* order row - compact */
 .orderRow{
-  margin-top:8px;
+  margin-top:6px;
   display:flex;
   align-items:center;
   gap:8px;
 }
-.orderLabel{
-  color:var(--muted);
-  font-size:12px;
-}
+.orderLabel{ color:var(--muted); font-size:12px; }
 .orderInput{
-  width:86px;
-  padding:8px 10px;
+  width:64px;
+  padding:6px 8px;
   border-radius:12px;
   border:1px solid rgba(255,255,255,.12);
   background:rgba(0,0,0,.18);
   color:var(--text);
 }
 
+/* palette inside card: single line, scroll-x */
 .player .palette{
-  margin-top:8px;
+  margin-top:6px;
   gap:6px;
+  flex-wrap: nowrap;              /* ✅ не переносится */
+  overflow-x: auto;               /* ✅ если не помещается — прокрутка по X */
+  overflow-y: hidden;
+  padding-bottom:2px;
+  max-width: 100%;
+}
+.player .palette::-webkit-scrollbar{ height:8px; }
+.player .palette::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14);
+  border-radius:999px;
+}
+.player .palette::-webkit-scrollbar-track{
+  background:rgba(255,255,255,.06);
+  border-radius:999px;
 }
 .player .swatch{
-  width:18px; height:18px;
+  width:16px; height:16px;
   border-radius:7px;
+  flex: 0 0 auto;
 }
 
 .pactions{
   position:relative;
   display:flex; gap:8px;
+  flex: 0 0 auto;
 }
 
 .iconbtn{
@@ -319,11 +356,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
 .item .meta{ color:var(--muted); font-size:12px; }
 .item .vals{ margin-top:6px; font-size:16px; font-weight:900; }
 
-.hint{
-  margin-top:10px;
-  color:var(--muted);
-  font-size:12px;
-}
+.hint{ margin-top:10px; color:var(--muted); font-size:12px; }
 
 .footer{
   margin-top:14px;
@@ -341,11 +374,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   transition:opacity .12s ease;
 }
 .throwOverlay.show{ opacity:1; }
-
-.throwSvg{
-  width:100%;
-  height:100%;
-}
+.throwSvg{ width:100%; height:100%; }
 .throwLine{
   stroke: rgba(255,255,255,.85);
   stroke-width: 3;
@@ -356,10 +385,7 @@ select:focus,input:focus{ border-color:rgba(255,59,59,.45); }
   fill: rgba(255,59,59,.95);
   filter: drop-shadow(0 6px 18px rgba(0,0,0,.45));
 }
-#arrowHead path{
-  fill: rgba(255,255,255,.90);
-}
-
+#arrowHead path{ fill: rgba(255,255,255,.90); }
 .throwHint{
   position:absolute;
   left:12px;
